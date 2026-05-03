@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OS Module II — Process &amp; Scheduling Simulator</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap');
+
+:root {
+  --bg: #0a0a0f;
+  --bg2: #0f0f18;
+  --bg3: #141422;
+  --bg4: #1a1a2e;
+  --panel: #111120;
+  --border: rgba(0,212,255,0.12);
+  --border2: rgba(0,255,136,0.15);
+  --green: #00ff88;
+  --cyan: #00d4ff;
+  --purple: #a855f7;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --mono: \'JetBrains Mono\', monospace;
+  --sans: \'Syne\', sans-serif;
+  --glow-green: 0 0 20px rgba(0,255,136,0.3);
+  --glow-cyan: 0 0 20px rgba(0,212,255,0.3);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: \'\';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.win-titlebar, #mod-nav, .win-statusbar { display: none !important; }
+
+.win-window {
+  background: transparent;
+  display: flex; flex-direction: column;
+}
+
+#app {
+  display: flex; flex-direction: column; height: 100vh; padding: 16px; gap: 16px;
+}
+
+#main-window { flex: 1; min-height: 0; }
+
+.win-tabs {
+  display: flex; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--border);
+  background: transparent; margin-top: 16px;
+}
+.win-tab {
+  padding: 10px 20px;
+  border: none; border-bottom: 2px solid transparent;
+  background: transparent;
+  cursor: pointer; font-size: 13px; font-family: var(--sans); font-weight: 600;
+  color: var(--text3); transition: all 0.2s;
+}
+.win-tab:hover { color: var(--text2); }
+.win-tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+.win-body { display: flex; flex: 1; min-height: 0; overflow: hidden; gap: 16px; margin-top: 16px; }
+
+#left-panel {
+  width: 280px; flex-shrink: 0;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px;
+}
+
+#right-panel {
+  flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; overflow-y: auto; display: flex; flex-direction: column;
+}
+
+.win-group {
+  background: rgba(0,212,255,0.02);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 8px; padding: 12px; margin-bottom: 12px;
+}
+.win-group-title {
+  font-family: var(--mono); font-size: 10px; color: var(--cyan); text-transform: uppercase;
+  margin-bottom: 12px; letter-spacing: 1px;
+}
+
+.form-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; color: var(--text2); }
+.form-row label { width: 80px; font-family: var(--sans); font-weight: 600; }
+.win-input, .win-select {
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  padding: 6px 10px; border-radius: 6px; font-family: var(--mono); font-size: 12px; flex: 1; outline: none;
+}
+.win-input:focus, .win-select:focus { border-color: var(--cyan); }
+.win-range { width: 100%; accent-color: var(--cyan); }
+
+.win-btn {
+  font-family: var(--sans); font-weight: 600; font-size: 12px; padding: 10px 16px; border-radius: 6px;
+  border: 1px solid; cursor: pointer; transition: all 0.2s; background: rgba(0,212,255,0.08);
+  color: var(--cyan); border-color: rgba(0,212,255,0.3); width: 100%; text-align: center; margin-top: 4px; display: block;
+}
+.win-btn:hover { background: rgba(0,212,255,0.15); box-shadow: var(--glow-cyan); }
+
+.state-box {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+  text-align: center; font-weight: bold; font-size: 14px; font-family: var(--mono); min-width: 100px;
+}
+
+.proc-table, .metrics-table { border-collapse: collapse; width: 100%; font-size: 12px; font-family: var(--mono); margin-top: 8px; }
+.proc-table th, .metrics-table th { background: rgba(0,212,255,0.05); color: var(--cyan); padding: 10px; border: 1px solid var(--border); text-transform: uppercase; font-size: 10px; letter-spacing: 1px;}
+.proc-table td, .metrics-table td { background: var(--bg3); color: var(--text); border: 1px solid var(--border); padding: 10px; text-align: center; }
+
+#gantt-area { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow-x: auto; white-space: nowrap; height: 60px; display: flex; align-items: center; margin-top: 12px; }
+.gantt-cell { display: inline-flex; align-items: center; justify-content: center; height: 36px; border-right: 1px solid var(--border); background: rgba(0,255,136,0.1); color: var(--green); font-family: var(--mono); font-weight: bold; font-size: 12px; }
+.gantt-cell:last-child { border-right: none; }
+
+#algo-explainer { background: rgba(0,212,255,0.05); border: 1px solid var(--cyan); border-radius: 8px; padding: 16px; font-family: var(--sans); font-size: 13px; color: var(--text2); margin-top: 16px; line-height: 1.6; }
+
+#log-window { height: 180px; border-radius: 12px; overflow: hidden; margin-top: 16px; background: var(--panel); border: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+.log-window-body { flex: 1; overflow-y: auto; padding: 16px; background: var(--bg2); color: var(--text2); font-family: var(--mono); font-size: 12px; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,212,255,0.3); }
+
+/* Overrides for dynamic elements */
+.cpu-status { font-family: var(--mono); font-size: 11px; margin-bottom: 8px; color: var(--cyan); }
+.cpu-box { background: var(--bg4); border: 1px solid var(--border); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; align-items: center; }
+.cpu-box .process-name { font-weight: bold; font-size: 16px; color: var(--green); }
+.queue-box { background: rgba(248,113,113,0.1); border: 1px solid var(--red); color: var(--red); padding: 6px; font-size: 12px; font-family: var(--mono); border-radius: 4px; display: inline-block; margin: 4px; }
+.ready-box { background: rgba(0,212,255,0.1); border: 1px solid var(--cyan); color: var(--cyan); padding: 6px; font-size: 12px; font-family: var(--mono); border-radius: 4px; display: inline-block; margin: 4px; }
+</style>
+</head>
+<body>
+  <!-- GLOBAL OS MODULES NAV BAR -->
+  <div style="background: rgba(10,10,20,0.95); border-bottom: 1px solid rgba(0,212,255,0.12); padding: 12px 20px; display: flex; gap: 16px; align-items: center; font-family: 'Syne', sans-serif; width: 100%; z-index: 10000; position: relative; box-sizing: border-box;">
+    <span style="color: #00d4ff; font-weight: 700; font-size: 16px; letter-spacing: 1px;">▶ OS MODULES</span>
+    <a href="osmod1.html" style="text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #94a3b8; background: transparent; border: 1px solid transparent;">Module 1: Intro</a>
+    <a href="osmod2.html" style="text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #00ff88; background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3); box-shadow: 0 0 10px rgba(0,255,136,0.2);">Module 2: Process & Scheduling</a>
+    <a href="index.html" style="text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #94a3b8; background: transparent; border: 1px solid transparent;">Module 3: IPC & Sync</a>
+  </div>
+
+<!-- ═══════════════════════════════════════════════
+     MAIN APPLICATION WINDOW
+════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- MAIN WINDOW -->
+  <div class="win-window" id="main-window" style="flex:1;min-height:0;display:flex;flex-direction:column;">
+
+    <!-- Title Bar -->
+    <div class="win-titlebar">
+      <div class="win-titlebar-left">
+        <!-- monitor icon -->
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1" y="1" width="12" height="9" fill="#000080" stroke="#fff" stroke-width="0.5"/>
+          <rect x="2" y="2" width="10" height="7" fill="#00008b"/>
+          <rect x="4" y="10" width="6" height="2" fill="#c0c0c0"/>
+          <rect x="2" y="12" width="10" height="1" fill="#808080"/>
+        </svg>
+        OS Module II — Process &amp; Scheduling Simulator
+      </div>
+      <div class="win-titlebar-btns">
+        <div class="win-titlebar-btn" onclick="toggleDark()" title="Dark Mode">
+          <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="none" stroke="#000" stroke-width="1"/><path d="M4 1 A3 3 0 0 0 4 7" fill="#000"/></svg>
+        </div>
+        <div class="win-titlebar-btn" onclick="resetAll()" title="Reset" style="color:#800000;">&#215;</div>
+      </div>
+    </div>
+
+    <!-- Module Nav -->
+    <div id="mod-nav">
+      <a href="os_simulator.html">&#9664; Module I: Fundamentals</a>
+      <a href="#" class="current">&#9658; Module II: Processes</a>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="win-tabs" id="main-tabs">
+      <div class="win-tab active" onclick="switchTab('processes')">1. Processes</div>
+      <div class="win-tab" onclick="switchTab('states')">2. States</div>
+      <div class="win-tab" onclick="switchTab('context')">3. Context Switch</div>
+      <div class="win-tab" onclick="switchTab('scheduling')">4. Scheduling</div>
+      <div class="win-tab" onclick="switchTab('threads')">5. Threads</div>
+    </div>
+
+    <!-- Body -->
+    <div class="win-body" style="flex:1;min-height:0;overflow:hidden;">
+
+      <!-- ──────────────── LEFT PANEL ──────────────── -->
+      <div id="left-panel">
+        <!-- Rendered dynamically per tab by renderLeftPanel() -->
+      </div>
+      <!-- /left-panel -->
+
+      <!-- ──────────────── RIGHT PANEL ──────────────── -->
+      <div id="right-panel">
+        <div id="tab-content">
+          <!-- Injected by JS per tab -->
+        </div>
+      </div>
+
+    </div>
+    <!-- /win-body -->
+
+    <!-- Status Bar -->
+    <div class="win-statusbar">
+      <div class="win-status-pane" id="status-main">Ready</div>
+      <div class="win-status-pane" style="flex:0 0 120px" id="status-time">Time: 0</div>
+      <div class="win-status-pane" style="flex:0 0 140px" id="status-algo">FCFS</div>
+    </div>
+
+  </div>
+  <!-- /main-window -->
+
+  <!-- LOG WINDOW -->
+  <div class="win-window" id="log-window">
+    <div class="win-titlebar">
+      <div class="win-titlebar-left">
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <rect x="1" y="1" width="10" height="10" fill="#000" stroke="#808080"/>
+          <rect x="2" y="2" width="6" height="1" fill="#00ff00"/>
+          <rect x="2" y="4" width="8" height="1" fill="#00ff00"/>
+          <rect x="2" y="6" width="5" height="1" fill="#00ff00"/>
+        </svg>
+        System Log — OS Event Monitor
+      </div>
+      <div class="win-titlebar-btns">
+        <div class="win-titlebar-btn" onclick="clearLog()">CLS</div>
+      </div>
+    </div>
+    <div class="log-window-body" id="log-body">
+      <span style="color:#00ffff">[SYS]</span> OS Module II Simulator initialized.<br>
+      <span style="color:#00ffff">[SYS]</span> Add processes and click Run to begin simulation.<br>
+    </div>
+  </div>
+
+</div>
+<!-- /app -->
+
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+let processes   = [];   // {id, name, arrival, burst, priority, remaining, state, color, startTime, finishTime, waitTime, tat}
+let nextPid     = 1;
+let simTime     = 0;
+let ctxSwitches = 0;
+let simRunning  = false;
+let simTimer    = null;
+let currentTab  = 'processes';
+let ganttData   = [];   // [{proc, start, end}]
+let simSteps    = [];   // queue of simulation frames
+let simStepIdx  = 0;
+
+const PROC_COLORS = [
+  '#6060ff','#009900','#cc6600','#990099','#006699',
+  '#cc0000','#008080','#996600','#660066','#333399'
+];
+
+const ALGO_NAMES = { fcfs:'FCFS', sjf:'SJF (Non-Preemptive)', priority:'Priority Scheduling', rr:'Round Robin' };
+
+/* ============================================================
+   LOGGING
+   ============================================================ */
+function log(msg, type='info') {
+  const colors = { info:'#00ff00', warn:'#ffff00', error:'#ff4040', sys:'#00ffff', ctx:'#ff88ff', sched:'#88ffff' };
+  const tags   = { info:'[INFO]', warn:'[WARN]', error:'[ERR ]', sys:'[SYS ]', ctx:'[CTX ]', sched:'[SCHED]' };
+  const el = document.getElementById('log-body');
+  const t  = String(simTime).padStart(3,'0');
+  el.innerHTML += `<span style="color:${colors[type]||colors.info}">${tags[type]||tags.info}</span> <span style="color:#888">T=${t}</span> ${msg}<br>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('log-body').innerHTML = '<span style="color:#00ffff">[SYS]</span> Log cleared.<br>';
+}
+
+/* ============================================================
+   PROCESSES
+   ============================================================ */
+function addProcess() {
+  const arrival  = parseInt(document.getElementById('inp-arrival').value) || 0;
+  const burst    = parseInt(document.getElementById('inp-burst').value)   || 1;
+  const priority = parseInt(document.getElementById('inp-priority').value)|| 1;
+  if(burst < 1 || burst > 30) { alert('Burst must be 1–30'); return; }
+  const p = {
+    id: nextPid, name: `P${nextPid}`,
+    arrival, burst, priority,
+    remaining: burst,
+    state: 'new',
+    color: PROC_COLORS[(nextPid-1) % PROC_COLORS.length],
+    startTime: -1, finishTime: -1, waitTime: 0, tat: 0
+  };
+  processes.push(p);
+  nextPid++;
+  log(`Process ${p.name} created [Arrival=${arrival}, Burst=${burst}, Priority=${priority}]`, 'sys');
+  const sp = document.getElementById('stat-procs');
+  if(sp) sp.textContent = processes.length;
+  // If on processes tab, re-render just the right panel to show new row
+  if(currentTab === 'processes') renderCurrentTab();
+}
+
+function removeLastProcess() {
+  if(!processes.length) return;
+  const p = processes.pop();
+  log(`Process ${p.name} removed`, 'warn');
+  const sp = document.getElementById('stat-procs');
+  if(sp) sp.textContent = processes.length;
+  if(currentTab === 'processes') renderCurrentTab();
+}
+
+function resetAll() {
+  processes = []; nextPid = 1; simTime = 0; ctxSwitches = 0;
+  simRunning = false; clearInterval(simTimer); simTimer = null;
+  clearInterval(stateSim.timer); stateSim.timer = null;
+  clearInterval(ctxSim.timer);   ctxSim.timer   = null;
+  ganttData = []; simSteps = []; simStepIdx = 0;
+  updateStatusBar();
+  renderLeftPanel();
+  renderCurrentTab();
+  log('Simulation reset.', 'sys');
+}
+
+/* ============================================================
+   TABS
+   ============================================================ */
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.win-tab').forEach((t, i) => {
+    const tabs = ['processes','states','context','scheduling','threads'];
+    t.classList.toggle('active', tabs[i] === tab);
+  });
+  // Stop any running timers from previous tab
+  clearInterval(stateSim.timer); stateSim.timer = null;
+  clearInterval(ctxSim.timer);   ctxSim.timer   = null;
+  renderLeftPanel();
+  renderCurrentTab();
+}
+
+/* ── LEFT PANEL: context-aware per tab ── */
+function renderLeftPanel() {
+  const lp = document.getElementById('left-panel');
+
+  // Shared stats block (always shown)
+  const statsBlock = `
+    <div class="win-group">
+      <div class="win-group-title">Stats</div>
+      <table style="width:100%;font-size:10px;border-collapse:collapse">
+        <tr><td style="color:#000080">Processes:</td><td id="stat-procs" style="text-align:right;font-weight:bold">${processes.length}</td></tr>
+        <tr><td style="color:#000080">Ctx Switches:</td><td id="stat-ctx" style="text-align:right;font-weight:bold">${ctxSwitches}</td></tr>
+        <tr><td style="color:#000080">Avg Wait:</td><td id="stat-wait" style="text-align:right;font-weight:bold">-</td></tr>
+        <tr><td style="color:#000080">Avg TAT:</td><td id="stat-tat" style="text-align:right;font-weight:bold">-</td></tr>
+        <tr><td style="color:#000080">CPU Util:</td><td id="stat-cpu" style="text-align:right;font-weight:bold">-</td></tr>
+      </table>
+    </div>`;
+
+  // Shared legend
+  const legendBlock = `
+    <div class="win-group">
+      <div class="win-group-title">Legend</div>
+      <div style="display:flex;flex-direction:column;gap:2px;font-size:10px">
+        <div style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:14px;height:10px;background:#d0d0ff;border:1px solid #8080ff"></span> NEW</div>
+        <div style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:14px;height:10px;background:#d0ffd0;border:1px solid #00a000"></span> READY</div>
+        <div style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:14px;height:10px;background:#ffffc0;border:1px solid #c0a000"></span> RUNNING</div>
+        <div style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:14px;height:10px;background:#ffd0d0;border:1px solid #c00000"></span> WAITING</div>
+        <div style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:14px;height:10px;background:#808080;border:1px solid #404040"></span> TERMINATED</div>
+      </div>
+    </div>`;
+
+  // Add process block (shown on tabs that need it)
+  const addProcBlock = `
+    <div class="win-group">
+      <div class="win-group-title">Add Process</div>
+      <div class="form-row">
+        <label>Arrival:</label>
+        <input id="inp-arrival" type="number" min="0" max="99" value="0" class="win-input" style="width:50px">
+      </div>
+      <div class="form-row">
+        <label>Burst:</label>
+        <input id="inp-burst" type="number" min="1" max="30" value="4" class="win-input" style="width:50px">
+      </div>
+      <div class="form-row">
+        <label>Priority:</label>
+        <input id="inp-priority" type="number" min="1" max="10" value="1" class="win-input" style="width:50px">
+      </div>
+      <div class="btn-row">
+        <button class="win-btn success" onclick="addProcess()">+ Add</button>
+        <button class="win-btn danger" onclick="removeLastProcess()">- Remove</button>
+      </div>
+    </div>`;
+
+  switch(currentTab) {
+
+    case 'processes':
+      lp.innerHTML = addProcBlock + `
+        <div class="win-group">
+          <div class="win-group-title">Actions</div>
+          <div class="btn-row" style="flex-direction:column;gap:4px">
+            <button class="win-btn" onclick="resetAll()" style="width:100%">Reset All</button>
+          </div>
+          <p style="font-size:9px;color:#555;margin-top:6px;line-height:1.5">Set Arrival &amp; Burst time, then click <b>+ Add</b>. Priority 1 = highest.</p>
+        </div>` + statsBlock;
+      break;
+
+    case 'states':
+      lp.innerHTML = `
+        <div class="win-group">
+          <div class="win-group-title">State Controls</div>
+          <div style="font-size:10px;color:#000080;margin-bottom:6px">Processes: <b>${processes.length}</b></div>
+          <div class="btn-row" style="flex-direction:column;gap:4px">
+            <button class="win-btn primary" onclick="stateStepAll()" style="width:100%">&#9654; Next Step</button>
+            <button class="win-btn" onclick="stateAutoRun()" style="width:100%">&#9654;&#9654; Auto Run</button>
+            <button class="win-btn danger" onclick="stateReset()" style="width:100%">Reset States</button>
+          </div>
+          <div class="form-row" style="margin-top:8px">
+            <label>Speed:</label>
+            <input type="range" min="100" max="2000" value="800" class="speed-track" id="speed-slider" style="flex:1">
+          </div>
+          <div style="font-size:10px;color:#000080;text-align:center" id="speed-label">Speed: Normal</div>
+        </div>
+        <div class="win-group" style="flex:1">
+          <div class="win-group-title">State Info</div>
+          <div style="font-size:10px;line-height:1.7;color:#000080">
+            <b>NEW:</b> Just created, entering OS<br>
+            <b>READY:</b> Waiting for CPU slot<br>
+            <b>RUNNING:</b> Actively using CPU<br>
+            <b>WAITING:</b> Blocked on I/O<br>
+            <b>TERMINATED:</b> Execution done<br>
+            <br>
+            <span style="color:#800000">Tip: Add processes first on the Processes tab.</span>
+          </div>
+        </div>` + legendBlock;
+      break;
+
+    case 'context':
+      lp.innerHTML = `
+        <div class="win-group">
+          <div class="win-group-title">Context Switch</div>
+          <div style="font-size:10px;color:#000080;margin-bottom:6px">Processes: <b>${processes.length}</b></div>
+          <div class="btn-row" style="flex-direction:column;gap:4px">
+            <button class="win-btn primary" onclick="ctxSwitch()" style="width:100%">&#9654; Switch CPU</button>
+            <button class="win-btn" onclick="ctxAutoRun()" style="width:100%">&#9654;&#9654; Auto Switch</button>
+            <button class="win-btn danger" onclick="ctxReset()" style="width:100%">Reset</button>
+          </div>
+          <div class="form-row" style="margin-top:8px">
+            <label>Speed:</label>
+            <input type="range" min="100" max="2000" value="800" class="speed-track" id="speed-slider" style="flex:1">
+          </div>
+          <div style="font-size:10px;color:#000080;text-align:center" id="speed-label">Speed: Normal</div>
+        </div>
+        <div class="win-group">
+          <div class="win-group-title">What is a Context Switch?</div>
+          <div style="font-size:10px;line-height:1.6;color:#000080">
+            Saving the state (PCB) of the current process and loading the state of the next.<br><br>
+            Cost: <b>~1–10 &micro;s</b><br>
+            Too many switches = <b>overhead</b> (thrashing).<br><br>
+            Total switches: <b id="ctx-count-left">${ctxSwitches}</b>
+          </div>
+        </div>` + statsBlock;
+      break;
+
+    case 'scheduling':
+      lp.innerHTML = addProcBlock + `
+        <div class="win-group">
+          <div class="win-group-title">Algorithm</div>
+          <div class="form-row">
+            <label>Type:</label>
+            <select id="algo-select" class="win-select" onchange="onAlgoChange()">
+              <option value="fcfs">FCFS</option>
+              <option value="sjf">SJF (Non-Pre)</option>
+              <option value="priority">Priority</option>
+              <option value="rr">Round Robin</option>
+            </select>
+          </div>
+          <div class="form-row" id="quantum-row" style="display:none">
+            <label>Quantum:</label>
+            <input id="inp-quantum" type="number" min="1" max="10" value="2" class="win-input" style="width:50px">
+          </div>
+          <div class="btn-row" style="margin-top:6px">
+            <button class="win-btn primary" onclick="runScheduling()" style="width:100%">&#9654; Run</button>
+          </div>
+        </div>` + statsBlock;
+      break;
+
+    case 'threads':
+      lp.innerHTML = `
+        <div class="win-group">
+          <div class="win-group-title">Thread Demo</div>
+          <div style="font-size:10px;color:#000080;margin-bottom:6px">Showing threads for <b>${Math.min(processes.length,3)||1}</b> process(es).</div>
+          <div class="btn-row" style="flex-direction:column;gap:4px">
+            <button class="win-btn" onclick="switchTab('processes')" style="width:100%">&#8592; Manage Processes</button>
+          </div>
+        </div>
+        <div class="win-group" style="flex:1">
+          <div class="win-group-title">Memory Layout</div>
+          <div style="font-size:10px;line-height:1.7;color:#000080">
+            <span style="background:#d0ffd0;padding:1px 4px">Green</span> = Shared<br>
+            <span style="background:#ffd0d0;padding:1px 4px">Pink</span> = Private<br>
+            <span style="background:#ffffc0;padding:1px 4px">Yellow</span> = Running<br>
+            <br>
+            Threads share:<br>
+            &bull; Code segment<br>
+            &bull; Heap<br>
+            &bull; Global data<br>
+            <br>
+            Threads own:<br>
+            &bull; Stack<br>
+            &bull; Registers<br>
+            &bull; Program counter
+          </div>
+        </div>`;
+      break;
+  }
+
+  // Re-attach speed slider listener
+  const sl = document.getElementById('speed-slider');
+  if(sl) sl.addEventListener('input', () => getSpeed());
+}
+
+function renderCurrentTab() {
+  const c = document.getElementById('tab-content');
+  switch(currentTab) {
+    case 'processes':  c.innerHTML = buildProcessTab();   break;
+    case 'states':     c.innerHTML = buildStatesTab();    initStatesTab(); break;
+    case 'context':    c.innerHTML = buildContextTab();   initContextTab(); break;
+    case 'scheduling': c.innerHTML = buildSchedTab();     break;
+    case 'threads':    c.innerHTML = buildThreadsTab();   break;
+  }
+}
+
+/* ============================================================
+   TAB 1: PROCESSES
+   ============================================================ */
+function buildProcessTab() {
+  const rows = processes.map(p => `
+    <tr>
+      <td><span class="proc-block state-${p.state}">${p.name}</span></td>
+      <td>${p.arrival}</td>
+      <td>${p.burst}</td>
+      <td>${p.priority}</td>
+      <td><span style="color:${p.color}">&#9632;</span> ${p.state.toUpperCase()}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" style="text-align:center;color:#808080;padding:12px">No processes — use Add Process panel</td></tr>';
+
+  return `
+    <div class="win-group" style="margin-bottom:6px">
+      <div class="win-group-title">What is a Process?</div>
+      <p style="font-size:10px;line-height:1.6;color:#000080">
+        A <b>process</b> is a program in execution. It has its own memory space (code, data, heap, stack),
+        CPU registers, and a unique Process ID (PID). The OS tracks it using a <b>Process Control Block (PCB)</b>.
+      </p>
+    </div>
+    <div class="win-group" style="flex:1;margin-bottom:0">
+      <div class="win-group-title">Process List</div>
+      <div class="win-inset" style="max-height:220px;overflow-y:auto">
+        <table class="proc-table">
+          <thead><tr><th>PID</th><th>Arrival</th><th>Burst</th><th>Priority</th><th>State</th></tr></thead>
+          <tbody id="proc-table-body">${rows}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="win-group" style="margin-top:6px">
+      <div class="win-group-title">PCB — Process Control Block</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${['PID','Program Counter','CPU Registers','Memory Limits','Open Files','State','Priority','I/O Status'].map(f =>
+          `<div style="border:1px solid #808080;background:#fffff0;padding:2px 6px;font-size:9px;font-family:'Courier New'">${f}</div>`
+        ).join('')}
+      </div>
+      <p style="font-size:10px;margin-top:4px;color:#555">Each process has its own PCB stored in kernel memory. Context switching = saving/restoring PCB fields.</p>
+    </div>
+  `;
+}
+
+/* ============================================================
+   TAB 2: PROCESS STATES
+   ============================================================ */
+let stateSim = { procs:[], step:0, auto:false, timer:null };
+
+function buildStatesTab() {
+  return `
+    <div style="display:flex;gap:6px;height:100%;min-height:0">
+      <!-- State diagram -->
+      <div class="win-window" style="flex:1;min-width:0;display:flex;flex-direction:column;">
+        <div class="win-titlebar">
+          <div class="win-titlebar-left">State Transition Diagram</div>
+        </div>
+        <div id="state-diagram" style="flex:1;overflow-y:auto;padding:10px;background:#d4d0c8">
+          <!-- NEW -->
+          <div class="state-row">
+            <div class="state-box" id="sbox-new">
+              <div class="state-label">NEW</div>
+              <div class="state-procs" id="sprocs-new"></div>
+            </div>
+          </div>
+          <div class="state-row"><div class="state-arrow">&#8595; admitted</div></div>
+          <!-- READY -->
+          <div class="state-row">
+            <div class="state-box" id="sbox-ready">
+              <div class="state-label">READY</div>
+              <div class="state-procs" id="sprocs-ready"></div>
+            </div>
+            <div class="state-arrow" style="font-size:9px;width:60px;text-align:center">&#8592; I/O done</div>
+            <div class="state-box" id="sbox-waiting">
+              <div class="state-label">WAITING</div>
+              <div class="state-procs" id="sprocs-waiting"></div>
+            </div>
+          </div>
+          <div class="state-row">
+            <div class="state-arrow">&#8595; dispatch</div>
+            <div style="width:66px"></div>
+            <div class="state-arrow">&#8593; I/O req</div>
+          </div>
+          <!-- RUNNING -->
+          <div class="state-row">
+            <div class="state-box" id="sbox-running" style="background:#ffffc0;">
+              <div class="state-label">RUNNING</div>
+              <div class="state-procs" id="sprocs-running"></div>
+            </div>
+          </div>
+          <div class="state-row"><div class="state-arrow">&#8595; exit</div></div>
+          <!-- TERMINATED -->
+          <div class="state-row">
+            <div class="state-box" id="sbox-terminated">
+              <div class="state-label">TERMINATED</div>
+              <div class="state-procs" id="sprocs-terminated"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Controls -->
+      <div style="width:160px;flex-shrink:0;display:flex;flex-direction:column;gap:6px">
+        <div class="win-group">
+          <div class="win-group-title">State Controls</div>
+          <div class="btn-row" style="flex-direction:column">
+            <button class="win-btn" onclick="stateStepAll()" id="btn-state-step">Next Step</button>
+            <button class="win-btn" onclick="stateAutoRun()" id="btn-state-auto">Auto Run</button>
+            <button class="win-btn danger" onclick="stateReset()">Reset States</button>
+          </div>
+        </div>
+        <div class="win-group" style="flex:1">
+          <div class="win-group-title">State Info</div>
+          <div id="state-info" style="font-size:10px;line-height:1.6;color:#000080">
+            Click <b>Next Step</b> to move processes through their lifecycle.
+            <br><br>
+            <b>NEW:</b> Just created<br>
+            <b>READY:</b> Waiting for CPU<br>
+            <b>RUNNING:</b> Using CPU<br>
+            <b>WAITING:</b> Waiting for I/O<br>
+            <b>TERMINATED:</b> Finished
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function initStatesTab() {
+  stateReset();
+}
+
+function stateReset() {
+  stateSim.procs = processes.map(p => ({ name:p.name, color:p.color, state:'new', io: Math.random() > 0.5 }));
+  stateSim.step = 0;
+  updateStateBoxes();
+}
+
+function updateStateBoxes() {
+  const states = ['new','ready','running','waiting','terminated'];
+  states.forEach(s => {
+    const el = document.getElementById(`sprocs-${s}`);
+    const box = document.getElementById(`sbox-${s}`);
+    if(!el) return;
+    const here = stateSim.procs.filter(p => p.state === s);
+    el.innerHTML = here.map(p => `<span style="color:${p.color};font-weight:bold;font-size:10px">${p.name} </span>`).join('');
+    box.classList.toggle('has-procs', here.length > 0);
+  });
+}
+
+function stateStepAll() {
+  const sp = stateSim.procs;
+  let moved = false;
+
+  // Move NEW → READY
+  sp.filter(p => p.state === 'new').forEach(p => {
+    p.state = 'ready'; moved = true;
+    log(`${p.name} moved NEW → READY (admitted to ready queue)`, 'sched');
+  });
+
+  if(moved) { updateStateBoxes(); return; }
+
+  // Dispatch first READY → RUNNING (if CPU free)
+  const running = sp.filter(p => p.state === 'running');
+  if(running.length === 0) {
+    const ready = sp.find(p => p.state === 'ready');
+    if(ready) {
+      ready.state = 'running';
+      log(`${ready.name} dispatched READY → RUNNING (CPU assigned)`, 'ctx');
+      moved = true;
+    }
+  } else {
+    // Running → WAITING or TERMINATED
+    running.forEach(p => {
+      if(p.io && Math.random() > 0.5) {
+        p.state = 'waiting';
+        log(`${p.name} RUNNING → WAITING (I/O request)`, 'info');
+      } else {
+        p.state = 'terminated';
+        log(`${p.name} RUNNING → TERMINATED (execution complete)`, 'sched');
+      }
+      moved = true;
+    });
+  }
+
+  // WAITING → READY
+  sp.filter(p => p.state === 'waiting').forEach(p => {
+    if(Math.random() > 0.5) {
+      p.state = 'ready';
+      log(`${p.name} WAITING → READY (I/O completed)`, 'info');
+      moved = true;
+    }
+  });
+
+  if(!moved) {
+    log('All processes terminated.', 'sys');
+    clearInterval(stateSim.timer); stateSim.auto = false;
+  }
+  updateStateBoxes();
+}
+
+function stateAutoRun() {
+  if(stateSim.timer) { clearInterval(stateSim.timer); stateSim.timer = null; return; }
+  stateReset();
+  stateSim.timer = setInterval(() => {
+    const allDone = stateSim.procs.every(p => p.state === 'terminated');
+    if(allDone) { clearInterval(stateSim.timer); stateSim.timer = null; return; }
+    stateStepAll();
+  }, getSpeed());
+}
+
+/* ============================================================
+   TAB 3: CONTEXT SWITCH
+   ============================================================ */
+let ctxSim = { queue:[], current:null, count:0, timer:null };
+
+function buildContextTab() {
+  return `
+    <div style="display:flex;gap:6px;height:100%;min-height:0;flex-wrap:wrap">
+      <div class="win-window" style="flex:1;min-width:200px;display:flex;flex-direction:column;">
+        <div class="win-titlebar"><div class="win-titlebar-left">CPU Scheduler</div></div>
+        <div id="cpu-visual" style="flex:1;overflow-y:auto;background:#d4d0c8;padding:10px">
+          <!-- rendered by initContextTab -->
+        </div>
+      </div>
+      <div style="width:160px;flex-shrink:0;display:flex;flex-direction:column;gap:6px">
+        <div class="win-group">
+          <div class="win-group-title">Context Switch</div>
+          <button class="win-btn primary" onclick="ctxSwitch()" style="width:100%;margin-bottom:4px">Switch CPU</button>
+          <button class="win-btn" onclick="ctxAutoRun()" style="width:100%;margin-bottom:4px">Auto Switch</button>
+          <button class="win-btn danger" onclick="ctxReset()" style="width:100%">Reset</button>
+        </div>
+        <div class="win-group" style="flex:1">
+          <div class="win-group-title">Info</div>
+          <div style="font-size:10px;line-height:1.6;color:#000080">
+            A <b>context switch</b> saves the current process's PCB state and loads the next process's state.<br><br>
+            Cost: <b>~1–10 µs</b> on modern hardware.<br><br>
+            <b>Count:</b> <span id="ctx-count" style="color:#800000;font-weight:bold">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function initContextTab() {
+  ctxReset();
+}
+
+function ctxReset() {
+  ctxSim.queue = processes.map(p => ({ name:p.name, color:p.color, remaining: p.burst }));
+  ctxSim.current = null; ctxSim.count = 0;
+  clearInterval(ctxSim.timer); ctxSim.timer = null;
+  renderCtxVisual();
+}
+
+function renderCtxVisual() {
+  const el = document.getElementById('cpu-visual');
+  if(!el) return;
+  const cur = ctxSim.current;
+  el.innerHTML = `
+    <div style="text-align:center;margin-bottom:10px">
+      <div style="font-size:9px;color:#000080;letter-spacing:2px;margin-bottom:4px">CENTRAL PROCESSING UNIT</div>
+      <div id="cpu-box" style="width:130px;height:60px;border:3px solid;border-color:#fff #808080 #808080 #fff;background:#000080;color:#fff;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;">
+        <div style="font-size:9px;color:#00ffff;letter-spacing:2px">CPU</div>
+        <div style="font-size:15px;color:#ffff00;font-weight:bold">${cur ? cur.name : 'IDLE'}</div>
+        ${cur ? `<div style="font-size:8px;color:#00ff00">Rem: ${cur.remaining}</div>` : ''}
+      </div>
+    </div>
+    <div style="font-size:9px;color:#000080;letter-spacing:1px;text-align:center;margin-bottom:6px">READY QUEUE</div>
+    <div class="ctx-queue" id="ctx-queue-el">
+      ${ctxSim.queue.filter(p => p !== ctxSim.current && p.remaining > 0).map(p =>
+        `<div class="proc-block state-ready">${p.name} (${p.remaining})</div>`
+      ).join('')}
+    </div>
+    <div style="text-align:center;margin-top:12px;font-size:10px;color:#808080">
+      Context Switches: <span style="color:#800000;font-weight:bold">${ctxSim.count}</span>
+    </div>
+    ${ctxSim.current ? `
+    <div style="margin-top:8px;background:#fffff0;border:1px solid #808080;padding:4px 6px;font-size:9px;font-family:'Courier New'">
+      <b>Saving PCB of ${ctxSim.current.name}:</b><br>
+      PC=0x${(Math.random()*0xFFFF|0).toString(16).toUpperCase()}&nbsp;
+      SP=0x${(Math.random()*0xFFFF|0).toString(16).toUpperCase()}&nbsp;
+      AX=${Math.random()*999|0}
+    </div>` : ''}
+  `;
+  const cntEl = document.getElementById('ctx-count');
+  if(cntEl) cntEl.textContent = ctxSim.count;
+}
+
+function ctxSwitch() {
+  const queue = ctxSim.queue.filter(p => p.remaining > 0);
+  if(!queue.length) { log('All processes done!', 'sys'); return; }
+
+  // Decrement current
+  if(ctxSim.current) ctxSim.current.remaining--;
+
+  // Remove finished
+  ctxSim.queue = ctxSim.queue.filter(p => p.remaining > 0);
+
+  // Round-robin: next in queue
+  if(!ctxSim.queue.length) {
+    ctxSim.current = null;
+    log('All processes completed.', 'sys');
+    clearInterval(ctxSim.timer); ctxSim.timer = null;
+    renderCtxVisual(); return;
+  }
+
+  const prevName = ctxSim.current ? ctxSim.current.name : 'IDLE';
+  const next = ctxSim.queue[0];
+  // Rotate
+  ctxSim.queue.push(ctxSim.queue.shift());
+  ctxSim.current = next;
+  ctxSim.count++;
+  ctxSwitches++;
+  document.getElementById('stat-ctx').textContent = ctxSwitches;
+  log(`Context switch: ${prevName} → ${ctxSim.current.name} [switch #${ctxSim.count}]`, 'ctx');
+  updateStatusBar();
+  renderCtxVisual();
+}
+
+function ctxAutoRun() {
+  if(ctxSim.timer) { clearInterval(ctxSim.timer); ctxSim.timer = null; return; }
+  ctxReset();
+  if(!ctxSim.queue.length) { log('Add processes first!','warn'); return; }
+  ctxSim.current = ctxSim.queue[0];
+  ctxSim.queue.push(ctxSim.queue.shift());
+  renderCtxVisual();
+  ctxSim.timer = setInterval(ctxSwitch, getSpeed());
+}
+
+/* ============================================================
+   TAB 4: SCHEDULING ALGORITHMS
+   ============================================================ */
+function buildSchedTab() {
+  return `
+    <div style="display:flex;flex-direction:column;gap:6px;height:100%;min-height:0;overflow-y:auto">
+      <div id="algo-explainer"></div>
+      <div class="win-window" style="display:flex;flex-direction:column;">
+        <div class="win-titlebar"><div class="win-titlebar-left">Gantt Chart</div></div>
+        <div id="gantt-area" style="min-height:80px;overflow-x:auto;padding:6px;background:#fff;"></div>
+      </div>
+      <div class="win-window" style="display:flex;flex-direction:column;flex:1;min-height:120px;">
+        <div class="win-titlebar"><div class="win-titlebar-left">Metrics</div></div>
+        <div style="overflow:auto;flex:1">
+          <table class="metrics-table" id="metrics-table">
+            <thead><tr><th>Process</th><th>Arrival</th><th>Burst</th><th>Priority</th><th>Start</th><th>Finish</th><th>Wait</th><th>TAT</th></tr></thead>
+            <tbody id="metrics-body"><tr><td colspan="8" style="text-align:center;padding:10px;color:#808080">Run a simulation to see metrics</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function onAlgoChange() {
+  const sel = document.getElementById('algo-select');
+  if(!sel) return;
+  const algo = sel.value;
+  const qrow = document.getElementById('quantum-row');
+  if(qrow) qrow.style.display = algo === 'rr' ? 'flex' : 'none';
+  document.getElementById('status-algo').textContent = ALGO_NAMES[algo];
+  if(currentTab === 'scheduling') updateAlgoExplainer();
+}
+
+const ALGO_EXPLAIN = {
+  fcfs: '<b>FCFS — First Come, First Served:</b> Processes are executed in the order they arrive. Simple but can cause "convoy effect" where short jobs wait behind long ones. Non-preemptive.',
+  sjf:  '<b>SJF — Shortest Job First:</b> Always picks the process with the shortest burst time from the ready queue. Optimal average wait time, but requires knowing burst time in advance. Non-preemptive.',
+  priority: '<b>Priority Scheduling:</b> Each process has a priority number. The CPU is given to the process with the highest priority (lowest number = highest priority here). Can cause starvation.',
+  rr:   '<b>Round Robin:</b> Each process gets a fixed time quantum. If not done, it goes back to the queue. Fair and responsive. Higher quantum → approaches FCFS. Lower → more context switches.',
+};
+
+function updateAlgoExplainer() {
+  const algo = document.getElementById('algo-select').value;
+  const el = document.getElementById('algo-explainer');
+  if(el) el.innerHTML = ALGO_EXPLAIN[algo] || '';
+}
+
+function runScheduling() {
+  if(!processes.length) { log('Add processes first!','warn'); return; }
+  switchTab('scheduling');
+  updateAlgoExplainer();
+
+  const algo = document.getElementById('algo-select').value;
+  const quantum = parseInt(document.getElementById('inp-quantum').value) || 2;
+
+  // Deep-copy processes for simulation
+  let procs = processes.map(p => ({
+    ...p, remaining: p.burst, startTime:-1, finishTime:-1, waitTime:0, tat:0
+  }));
+
+  ganttData = [];
+  let timeline = [];
+
+  if(algo === 'fcfs')     timeline = scheduleFCFS(procs);
+  else if(algo === 'sjf') timeline = scheduleSJF(procs);
+  else if(algo === 'priority') timeline = schedulePriority(procs);
+  else if(algo === 'rr')  timeline = scheduleRR(procs, quantum);
+
+  // Calculate metrics
+  let totalWait = 0, totalTAT = 0;
+  procs.forEach(p => {
+    p.tat = p.finishTime - p.arrival;
+    p.waitTime = p.tat - p.burst;
+    totalWait += p.waitTime;
+    totalTAT  += p.tat;
+  });
+
+  const avgWait = (totalWait / procs.length).toFixed(2);
+  const avgTAT  = (totalTAT  / procs.length).toFixed(2);
+  const totalTime = procs.reduce((m,p)=>Math.max(m,p.finishTime),0);
+  const cpuUtil = Math.round(procs.reduce((s,p)=>s+p.burst,0) / totalTime * 100);
+
+  document.getElementById('stat-wait').textContent = avgWait;
+  document.getElementById('stat-tat').textContent  = avgTAT;
+  document.getElementById('stat-cpu').textContent  = cpuUtil + '%';
+
+  renderGantt(timeline, totalTime);
+  renderMetrics(procs, avgWait, avgTAT);
+  log(`Scheduling complete: Algo=${ALGO_NAMES[algo]}, AvgWait=${avgWait}, AvgTAT=${avgTAT}, CPU=${cpuUtil}%`, 'sched');
+}
+
+/* ── FCFS ── */
+function scheduleFCFS(procs) {
+  const sorted = [...procs].sort((a,b) => a.arrival - b.arrival);
+  let time = 0, timeline = [];
+  sorted.forEach(p => {
+    if(time < p.arrival) time = p.arrival;
+    p.startTime = time;
+    timeline.push({ proc: p.name, color: p.color, start: time, end: time + p.burst });
+    time += p.burst;
+    p.finishTime = time;
+    log(`${p.name}: start=${p.startTime}, finish=${p.finishTime}`, 'sched');
+  });
+  // write back
+  sorted.forEach(s => { const orig = procs.find(p=>p.name===s.name); if(orig){orig.startTime=s.startTime;orig.finishTime=s.finishTime;} });
+  return timeline;
+}
+
+/* ── SJF ── */
+function scheduleSJF(procs) {
+  let time = 0, done = 0, n = procs.length, timeline = [];
+  const rem = procs.map(p => ({ ...p }));
+  while(done < n) {
+    const avail = rem.filter(p => p.arrival <= time && p.finishTime === -1);
+    if(!avail.length) { time++; continue; }
+    avail.sort((a,b) => a.burst - b.burst);
+    const p = avail[0];
+    if(p.startTime === -1) p.startTime = time;
+    timeline.push({ proc:p.name, color:p.color, start:time, end:time+p.burst });
+    time += p.burst;
+    p.finishTime = time; done++;
+    log(`SJF: ${p.name} executed [burst=${p.burst}]`, 'sched');
+  }
+  rem.forEach(r => { const o=procs.find(p=>p.name===r.name); if(o){o.startTime=r.startTime;o.finishTime=r.finishTime;} });
+  return timeline;
+}
+
+/* ── Priority ── */
+function schedulePriority(procs) {
+  let time = 0, done = 0, n = procs.length, timeline = [];
+  const rem = procs.map(p => ({ ...p, done: false }));
+  while(done < n) {
+    const avail = rem.filter(p => p.arrival <= time && !p.done);
+    if(!avail.length) { time++; continue; }
+    avail.sort((a,b) => a.priority - b.priority);
+    const p = avail[0];
+    if(p.startTime === -1) p.startTime = time;
+    timeline.push({ proc:p.name, color:p.color, start:time, end:time+p.burst });
+    time += p.burst;
+    p.finishTime = time; p.done = true; done++;
+    log(`Priority: ${p.name} (pri=${p.priority}) executed`, 'sched');
+  }
+  rem.forEach(r => { const o=procs.find(p=>p.name===r.name); if(o){o.startTime=r.startTime;o.finishTime=r.finishTime;} });
+  return timeline;
+}
+
+/* ── Round Robin ── */
+function scheduleRR(procs, q) {
+  const queue = procs.map(p => ({ ...p, remaining:p.burst, startTime:-1, finishTime:-1 })).sort((a,b)=>a.arrival-b.arrival);
+  let time = 0, timeline = [], readyQ = [];
+  let remaining = [...queue];
+  // Seed first arrival
+  remaining.filter(p=>p.arrival===0).forEach(p=>{readyQ.push(p); remaining=remaining.filter(x=>x!==p);});
+  while(readyQ.length || remaining.length) {
+    if(!readyQ.length) {
+      time = remaining[0].arrival;
+      readyQ.push(remaining.shift());
+    }
+    const p = readyQ.shift();
+    if(p.startTime === -1) p.startTime = time;
+    const run = Math.min(q, p.remaining);
+    timeline.push({ proc:p.name, color:p.color, start:time, end:time+run });
+    time += run;
+    p.remaining -= run;
+    // Admit new arrivals during this quantum
+    remaining.filter(x=>x.arrival <= time).forEach(x => readyQ.push(x));
+    remaining = remaining.filter(x=>x.arrival > time);
+    if(p.remaining > 0) readyQ.push(p);
+    else { p.finishTime = time; log(`RR: ${p.name} completed at T=${time}`, 'sched'); }
+  }
+  queue.forEach(r => { const o=procs.find(p=>p.name===r.name); if(o){o.startTime=r.startTime;o.finishTime=r.finishTime;} });
+  return timeline;
+}
+
+/* ── Render Gantt ── */
+function renderGantt(timeline, totalTime) {
+  const container = document.getElementById('gantt-area');
+  if(!container) return;
+  const scale = Math.max(28, Math.min(60, Math.floor(500 / Math.max(totalTime, 1))));
+
+  // Group by process
+  const procs = [...new Set(timeline.map(t=>t.proc))];
+  let html = '';
+
+  procs.forEach(name => {
+    const seg = timeline.filter(t=>t.proc===name);
+    const color = seg[0].color;
+    let rowHtml = `<div class="gantt-row-wrap">
+      <div class="gantt-row-label">${name}</div>
+      <div style="position:relative;height:20px;flex:1">`;
+
+    // Empty background spans
+    rowHtml += `<div style="position:absolute;left:0;top:0;width:${totalTime*scale}px;height:100%;background:#f8f8f8;border:1px solid #ddd"></div>`;
+    seg.forEach(s => {
+      const w = (s.end - s.start) * scale;
+      const l = s.start * scale;
+      rowHtml += `<div class="gantt-cell" style="position:absolute;left:${l}px;width:${w-1}px;background:${color};color:#fff;font-size:9px;line-height:20px;text-align:center;overflow:hidden" title="${s.proc}: T${s.start}–T${s.end}">${s.proc}</div>`;
+    });
+    rowHtml += '</div></div>';
+    html += rowHtml;
+  });
+
+  // Timeline ticks
+  html += `<div class="gantt-timeline" style="margin-left:34px">`;
+  for(let t=0; t<=totalTime; t++) {
+    html += `<div class="gantt-tick" style="width:${scale}px;flex-shrink:0">${t}</div>`;
+  }
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+/* ── Render Metrics ── */
+function renderMetrics(procs, avgWait, avgTAT) {
+  const tbody = document.getElementById('metrics-body');
+  if(!tbody) return;
+  const rows = procs.map(p => `
+    <tr>
+      <td style="color:${p.color};font-weight:bold">${p.name}</td>
+      <td>${p.arrival}</td>
+      <td>${p.burst}</td>
+      <td>${p.priority}</td>
+      <td>${p.startTime}</td>
+      <td>${p.finishTime}</td>
+      <td>${p.waitTime}</td>
+      <td>${p.tat}</td>
+    </tr>
+  `).join('');
+  tbody.innerHTML = rows + `
+    <tr class="avg-row">
+      <td colspan="6" style="text-align:right">Averages:</td>
+      <td>${avgWait}</td>
+      <td>${avgTAT}</td>
+    </tr>
+  `;
+}
+
+/* ============================================================
+   TAB 5: THREADS
+   ============================================================ */
+function buildThreadsTab() {
+  const threadCount = 3;
+  return `
+    <div style="overflow-y:auto;height:100%;padding:4px">
+      <div class="win-group" style="margin-bottom:8px">
+        <div class="win-group-title">Process vs Thread — Key Differences</div>
+        <table class="metrics-table" style="width:100%">
+          <thead><tr><th>Aspect</th><th>Process</th><th>Thread</th></tr></thead>
+          <tbody>
+            <tr><td>Definition</td><td>Program in execution</td><td>Unit of execution within a process</td></tr>
+            <tr><td>Memory</td><td>Own address space</td><td>Shared with process</td></tr>
+            <tr><td>Overhead</td><td>High (separate PCB)</td><td>Low (lightweight)</td></tr>
+            <tr><td>Communication</td><td>IPC (slow)</td><td>Direct (shared mem, fast)</td></tr>
+            <tr><td>Creation time</td><td>Slow</td><td>Fast</td></tr>
+            <tr><td>Crash effect</td><td>Isolated</td><td>Can crash whole process</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="thread-area">
+        ${processes.length ? processes.slice(0,3).map((p,pi) => `
+          <div class="thread-process-box">
+            <div class="thread-process-title">PROCESS ${p.name} (PID: ${1000+pi}) — Shared: Code + Heap + Data</div>
+            <div style="margin-bottom:4px">
+              <div class="thread-mem-bar" style="width:100%">Code Segment &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Data Segment &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Heap (shared)</div>
+            </div>
+            ${[1,2,3].map(t => `
+              <div class="thread-row">
+                <div class="thread-box ${t===1?'running-t':''}">
+                  Thread T${t} ${t===1?'[RUNNING]':'[READY]'}
+                </div>
+                <div style="font-size:9px;color:#808080">&#8594;</div>
+                <div class="thread-box private" style="min-width:80px">Stack T${t}</div>
+                <div style="font-size:9px;color:#808080">&#8594;</div>
+                <div class="thread-box private" style="min-width:60px">Regs T${t}</div>
+                <div style="font-size:9px;color:#808080">&#8594;</div>
+                <div class="thread-box shared" style="min-width:60px">Shared Heap</div>
+              </div>
+            `).join('')}
+          </div>
+        `).join('') : `
+          <div class="thread-process-box">
+            <div class="thread-process-title">PROCESS P1 (PID: 1001) — Example</div>
+            <div class="thread-mem-bar">Code Segment &nbsp;&nbsp; Data Segment &nbsp;&nbsp; Heap (shared)</div>
+            ${[1,2,3].map(t => `
+              <div class="thread-row" style="margin-top:4px">
+                <div class="thread-box ${t===1?'running-t':''}">&nbsp;Thread T${t} ${t===1?'[RUN]':''}</div>
+                <div style="font-size:9px;color:#808080">&#8594;</div>
+                <div class="thread-box private">Stack T${t}</div>
+                <div style="font-size:9px;color:#808080">&#8594;</div>
+                <div class="thread-box shared">Shared Heap</div>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+
+      <div class="win-group" style="margin-top:8px">
+        <div class="win-group-title">Thread Types</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:130px;border:1px solid #808080;background:#d0d0ff;padding:6px">
+            <b style="font-size:10px">User-Level Threads</b><br>
+            <span style="font-size:9px">Managed by user library. Fast but OS unaware — blocking syscall blocks all threads.</span>
+          </div>
+          <div style="flex:1;min-width:130px;border:1px solid #808080;background:#d0ffd0;padding:6px">
+            <b style="font-size:10px">Kernel-Level Threads</b><br>
+            <span style="font-size:9px">OS manages each thread. Slower creation but true parallelism on multi-core CPUs.</span>
+          </div>
+          <div style="flex:1;min-width:130px;border:1px solid #808080;background:#ffffc0;padding:6px">
+            <b style="font-size:10px">Hybrid (M:N)</b><br>
+            <span style="font-size:9px">Maps M user threads to N kernel threads. Used by Go runtime (goroutines).</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   SIMULATION STEP / AUTO RUN (generic)
+   ============================================================ */
+function stepSim() {
+  switch(currentTab) {
+    case 'states':   stateStepAll(); break;
+    case 'context':  ctxSwitch();    break;
+    case 'scheduling': runScheduling(); break;
+    default: log('Switch to States, Context, or Scheduling tab to step', 'warn');
+  }
+}
+
+function autoRun() {
+  switch(currentTab) {
+    case 'states':   stateAutoRun(); break;
+    case 'context':  ctxAutoRun();   break;
+    case 'scheduling': runScheduling(); break;
+    default: log('Switch to a simulation tab first', 'warn');
+  }
+}
+
+function pauseSim() {
+  clearInterval(simTimer); simTimer = null;
+  clearInterval(stateSim.timer); stateSim.timer = null;
+  clearInterval(ctxSim.timer); ctxSim.timer = null;
+  log('Simulation paused.', 'warn');
+}
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function getSpeed() {
+  const slider = document.getElementById('speed-slider');
+  const val = slider ? parseInt(slider.value) : 800;
+  const ms = 2200 - val; // inverted: high slider = fast = low ms
+  const label = document.getElementById('speed-label');
+  if(label) label.textContent = val < 400 ? 'Speed: Slow' : val < 1200 ? 'Speed: Normal' : 'Speed: Fast';
+  return ms;
+}
+
+function updateStat(id, val) {
+  const el = document.getElementById(id);
+  if(el) el.textContent = val;
+}
+
+function updateStatusBar() {
+  document.getElementById('status-time').textContent = `Time: ${simTime}`;
+  document.getElementById('status-main').textContent = simRunning ? 'Simulating...' : 'Ready';
+}
+
+function toggleDark() {
+  document.body.classList.toggle('dark-mode');
+  log('Dark mode ' + (document.body.classList.contains('dark-mode') ? 'ON' : 'OFF'), 'sys');
+}
+
+/* ── INIT ── */
+document.addEventListener('DOMContentLoaded', () => {
+  // Render left panel first so inputs exist before addProcess() reads them
+  currentTab = 'processes';
+  renderLeftPanel();
+
+  // Load 3 sample processes
+  const samples = [
+    {arrival:0, burst:5, priority:2},
+    {arrival:2, burst:3, priority:1},
+    {arrival:4, burst:7, priority:3},
+  ];
+  samples.forEach(s => {
+    document.getElementById('inp-arrival').value  = s.arrival;
+    document.getElementById('inp-burst').value    = s.burst;
+    document.getElementById('inp-priority').value = s.priority;
+    addProcess();
+  });
+
+  renderCurrentTab();
+  log('[SYS] 3 sample processes loaded. Explore tabs or add more processes.', 'sys');
+});
+</script>
+</body>
+</html>

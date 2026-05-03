@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OS Module 3 - IPC, Synchronization & Deadlocks Simulator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <!-- GLOBAL OS MODULES NAV BAR -->
+  <div style="background: rgba(10,10,20,0.95); border-bottom: 1px solid rgba(0,212,255,0.12); padding: 12px 20px; display: flex; gap: 16px; align-items: center; font-family: 'Syne', sans-serif; width: 100%; z-index: 10000; position: relative; box-sizing: border-box;">
+    <span style="color: #00d4ff; font-weight: 700; font-size: 16px; letter-spacing: 1px;">▶ OS MODULES</span>
+    <a href="osmod1.html" style="text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #94a3b8; background: transparent; border: 1px solid transparent;">Module 1: Intro</a>
+    <a href="osmod2.html" style="text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #94a3b8; background: transparent; border: 1px solid transparent;">Module 2: Process & Scheduling</a>
+    <a href="index.html" style="text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #00ff88; background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3); box-shadow: 0 0 10px rgba(0,255,136,0.2);">Module 3: IPC & Sync</a>
+  </div>
+
+
+
+  <!-- MENUBAR -->
+  <div class="menubar">
+
+    <span class="menu-right">Speed: <input type="range" id="globalSpeed" min="200" max="2000" value="800"
+        style="width:80px;vertical-align:middle;"> <span id="speedLabel">800ms</span></span>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tabbar">
+    <button class="tab active" data-tab="ipc">1. IPC</button>
+    <button class="tab" data-tab="race">2. Race Condition</button>
+    <button class="tab" data-tab="critical">3. Critical Section</button>
+    <button class="tab" data-tab="peterson">4. Peterson's Solution</button>
+    <button class="tab" data-tab="semaphore">5. Semaphores</button>
+    <button class="tab" data-tab="prodcons">6. Producer-Consumer</button>
+    <button class="tab" data-tab="deadlock">7. Deadlocks</button>
+  </div>
+
+  <!-- MAIN LAYOUT -->
+  <div class="main-layout">
+
+    <!-- LEFT PANEL: Controls -->
+    <div class="panel left-panel" id="leftPanel">
+      <div class="panel-title">▶ Controls</div>
+      <div class="panel-body" id="controlsBody">
+        <!-- Injected per tab -->
+      </div>
+    </div>
+
+    <!-- CENTER PANEL: Visualization -->
+    <div class="panel center-panel">
+      <div class="panel-title" id="vizTitle">▶ Visualization</div>
+      <div class="panel-body viz-body" id="vizBody">
+        <!-- Injected per tab -->
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: Explanation -->
+    <div class="panel right-panel" id="rightPanel" style="width: 280px; flex-shrink: 0; background: #fdfdfd; overflow-y: auto;">
+      <div class="panel-title">▶ Topic Guide & Explanation</div>
+      <div class="panel-body" id="topicExplanationText" style="font-size: 12px; line-height: 1.5; color: #222;">
+        <!-- Explanation injected per tab -->
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM PANEL: Logs -->
+  <div class="panel bottom-panel">
+    <div class="panel-title">
+      ▶ Event Log &amp; Explanation
+      <button class="btn-small" onclick="clearLog()" style="float:right;margin-top:-2px;">Clear</button>
+    </div>
+    <div class="log-area" id="logArea">
+      <div class="log-info">[ System ready. Select a tab and press Start. ]</div>
+    </div>
+  </div>
+
+  <!-- TOOLTIP -->
+  <div id="tooltip" class="tooltip" style="display:none;"></div>
+
+  <script src="sim.js"></script>
+</body>
+
+</html>

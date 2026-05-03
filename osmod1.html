@@ -1,0 +1,2585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OS Module I — Interactive Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --bg2: #0f0f18;
+  --bg3: #141422;
+  --bg4: #1a1a2e;
+  --panel: #111120;
+  --border: rgba(0,212,255,0.12);
+  --border2: rgba(0,255,136,0.15);
+  --green: #00ff88;
+  --cyan: #00d4ff;
+  --purple: #a855f7;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Syne', sans-serif;
+  --glow-green: 0 0 20px rgba(0,255,136,0.3);
+  --glow-cyan: 0 0 20px rgba(0,212,255,0.3);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scanline effect */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* ── SIDEBAR ── */
+#sidebar {
+  position: fixed;
+  left: 0; top: 0;
+  width: 240px;
+  height: 100vh;
+  background: rgba(10,10,20,0.95);
+  border-right: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  transition: transform 0.3s;
+}
+
+.sidebar-logo {
+  padding: 20px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-logo .logo-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--green);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.sidebar-logo .logo-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 4px;
+}
+
+.progress-bar-wrap {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.progress-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.progress-bar-bg {
+  height: 4px;
+  background: var(--bg4);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--cyan));
+  border-radius: 2px;
+  transition: width 0.6s ease;
+  width: 0%;
+}
+
+.nav-section {
+  padding: 8px 0;
+}
+
+.nav-section-title {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 4px 20px 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  font-size: 13px;
+  color: var(--text2);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.nav-item:hover {
+  color: var(--cyan);
+  background: rgba(0,212,255,0.05);
+  border-left-color: var(--cyan);
+}
+
+.nav-item.active {
+  color: var(--green);
+  background: rgba(0,255,136,0.06);
+  border-left-color: var(--green);
+}
+
+.nav-item .nav-icon {
+  font-size: 14px;
+  width: 16px;
+  text-align: center;
+}
+
+.nav-item .nav-explored {
+  margin-left: auto;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  display: none;
+}
+
+.nav-item.explored .nav-explored { display: block; }
+
+/* ── MAIN ── */
+#main {
+  margin-left: 240px;
+  min-height: 100vh;
+}
+
+/* ── HERO ── */
+#hero {
+  padding: 60px 60px 40px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 20% 50%, rgba(0,255,136,0.04) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 50%, rgba(0,212,255,0.04) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.hero-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--green);
+  background: rgba(0,255,136,0.1);
+  border: 1px solid rgba(0,255,136,0.2);
+  border-radius: 20px;
+  padding: 4px 12px;
+  display: inline-block;
+  margin-bottom: 16px;
+  letter-spacing: 1px;
+}
+
+.hero-title {
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #fff 0%, var(--cyan) 50%, var(--green) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 12px;
+}
+
+.hero-sub {
+  font-size: 16px;
+  color: var(--text2);
+  max-width: 600px;
+  margin-bottom: 20px;
+}
+
+.hero-stats {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.hero-stat {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text3);
+}
+
+.hero-stat span {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+/* ── SECTIONS ── */
+.section {
+  padding: 60px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.section-icon {
+  font-size: 28px;
+  width: 52px; height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.section-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.section-desc {
+  font-size: 14px;
+  color: var(--text2);
+}
+
+.section-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ── CARDS ── */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.card-title {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--cyan);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* ── INFO BOX ── */
+.info-box {
+  background: rgba(0,212,255,0.04);
+  border: 1px solid rgba(0,212,255,0.15);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-top: 24px;
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.7;
+}
+
+.info-box strong {
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+.info-box-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--cyan);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── FUN FACT ── */
+.fun-fact {
+  background: rgba(0,255,136,0.04);
+  border: 1px solid rgba(0,255,136,0.15);
+  border-left: 3px solid var(--green);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--text2);
+}
+
+.fun-fact-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--green);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+/* ── BTN ── */
+.btn {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+
+.btn-green {
+  color: var(--green);
+  border-color: rgba(0,255,136,0.3);
+  background: rgba(0,255,136,0.08);
+}
+.btn-green:hover {
+  background: rgba(0,255,136,0.15);
+  box-shadow: var(--glow-green);
+}
+
+.btn-cyan {
+  color: var(--cyan);
+  border-color: rgba(0,212,255,0.3);
+  background: rgba(0,212,255,0.08);
+}
+.btn-cyan:hover {
+  background: rgba(0,212,255,0.15);
+  box-shadow: var(--glow-cyan);
+}
+
+.btn-amber {
+  color: var(--amber);
+  border-color: rgba(251,191,36,0.3);
+  background: rgba(251,191,36,0.08);
+}
+.btn-amber:hover { background: rgba(251,191,36,0.15); }
+
+/* ── TAG ── */
+.tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+.tag-green { color: var(--green); background: rgba(0,255,136,0.1); }
+.tag-cyan  { color: var(--cyan); background: rgba(0,212,255,0.1); }
+.tag-amber { color: var(--amber); background: rgba(251,191,36,0.1); }
+.tag-red   { color: var(--red); background: rgba(248,113,113,0.1); }
+.tag-purple{ color: var(--purple); background: rgba(168,85,247,0.1); }
+
+/* ── TOGGLE ── */
+.toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle {
+  width: 36px; height: 20px;
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.toggle::after {
+  content: '';
+  position: absolute;
+  left: 2px; top: 2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--text3);
+  transition: all 0.2s;
+}
+
+.toggle.on {
+  background: rgba(0,255,136,0.2);
+  border-color: var(--green);
+}
+.toggle.on::after {
+  left: 18px;
+  background: var(--green);
+}
+
+/* ── GRID ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+/* ── TABS ── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.tab {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 16px;
+  border-bottom: 2px solid transparent;
+  color: var(--text3);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+}
+
+.tab:hover { color: var(--text2); }
+.tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+/* ─────────────────────────────────────────
+   1. BOOT SEQUENCE
+───────────────────────────────────────── */
+#boot-timeline {
+  position: relative;
+  padding: 20px 0;
+}
+
+.boot-progress-bar {
+  height: 3px;
+  background: var(--bg4);
+  border-radius: 2px;
+  margin-bottom: 32px;
+  overflow: hidden;
+}
+
+.boot-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--cyan));
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.5s ease;
+}
+
+.boot-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.boot-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 18px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s;
+  opacity: 0.4;
+}
+
+.boot-step:hover { border-color: rgba(0,212,255,0.3); opacity: 0.7; }
+.boot-step.active {
+  opacity: 1;
+  border-color: var(--cyan);
+  background: rgba(0,212,255,0.06);
+  box-shadow: var(--glow-cyan);
+}
+.boot-step.done {
+  opacity: 0.8;
+  border-color: rgba(0,255,136,0.25);
+}
+
+.boot-step-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: var(--bg4);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+
+.boot-step.active .boot-step-icon {
+  background: rgba(0,212,255,0.15);
+  border-color: var(--cyan);
+}
+
+.boot-step.done .boot-step-icon {
+  background: rgba(0,255,136,0.1);
+  border-color: var(--green);
+}
+
+.boot-step-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.boot-step-time {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+  margin-bottom: 4px;
+}
+
+.boot-step-desc {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.5;
+  display: none;
+}
+
+.boot-step.active .boot-step-desc,
+.boot-step.done .boot-step-desc { display: block; }
+
+.boot-step-detail {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--green);
+  background: var(--bg);
+  border: 1px solid rgba(0,255,136,0.1);
+  border-radius: 6px;
+  padding: 8px 12px;
+  line-height: 1.8;
+  display: none;
+}
+
+.boot-step.active .boot-step-detail { display: block; }
+
+.boot-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.boot-status {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  margin-left: auto;
+}
+
+.boot-status .blink {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%,100%{opacity:1} 50%{opacity:0}
+}
+
+/* ─────────────────────────────────────────
+   2. MULTI PANELS
+───────────────────────────────────────── */
+.multi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.multi-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.multi-panel-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.multi-panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.multi-panel-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.multi-panel-body {
+  padding: 14px;
+  height: 240px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Multiprogramming */
+.mp-cpu-bar {
+  height: 24px;
+  background: var(--bg3);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+}
+
+.mp-seg {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  transition: width 0.3s;
+}
+
+.mp-legend {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.mp-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text2);
+}
+
+.mp-legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 2px;
+}
+
+/* Gantt chart for multitasking */
+.gantt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  height: 22px;
+}
+
+.gantt-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+  width: 40px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.gantt-track {
+  flex: 1;
+  height: 100%;
+  background: var(--bg3);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.gantt-block {
+  position: absolute;
+  height: 100%;
+  border-radius: 2px;
+  transition: all 0.3s;
+}
+
+/* Multithreading */
+.thread-process {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.thread-process-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--cyan);
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+.thread-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.thread-lane {
+  height: 14px;
+  background: var(--bg);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.thread-pulse {
+  position: absolute;
+  height: 100%;
+  border-radius: 3px;
+  width: 30%;
+  animation: threadPulse 2s ease-in-out infinite;
+}
+
+@keyframes threadPulse {
+  0%   { left: -30%; opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
+.multi-controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+/* ─────────────────────────────────────────
+   3. SYSTEM CALL SIMULATOR
+───────────────────────────────────────── */
+.syscall-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+}
+
+.syscall-cats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.syscall-cat {
+  padding: 12px 14px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.syscall-cat:hover {
+  border-color: rgba(0,212,255,0.3);
+}
+
+.syscall-cat.active {
+  border-color: var(--cyan);
+  background: rgba(0,212,255,0.06);
+}
+
+.syscall-cat-name {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.syscall-cat-icon {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.syscall-cat-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.syscall-main {}
+
+.syscall-calls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.syscall-chip {
+  padding: 8px 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--green);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.syscall-chip:hover {
+  background: rgba(0,255,136,0.08);
+  border-color: rgba(0,255,136,0.3);
+  box-shadow: var(--glow-green);
+}
+
+.syscall-chip.active {
+  background: rgba(0,255,136,0.12);
+  border-color: var(--green);
+}
+
+/* Mode switch animation */
+.mode-switch {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.mode-layers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.mode-layer {
+  padding: 10px 14px;
+  text-align: center;
+  transition: all 0.4s;
+}
+
+.mode-layer-user {
+  background: var(--bg3);
+}
+
+.mode-layer-kernel {
+  background: var(--bg3);
+}
+
+.mode-layer.highlighted-user {
+  background: rgba(251,191,36,0.15);
+}
+
+.mode-layer.highlighted-kernel {
+  background: rgba(168,85,247,0.15);
+}
+
+.mode-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.mode-user .mode-label { color: var(--amber); }
+.mode-kernel .mode-label { color: var(--purple); }
+
+.mode-desc {
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.syscall-flow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+  padding: 10px;
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.flow-step {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0.4;
+  transition: opacity 0.3s, background 0.3s;
+  white-space: nowrap;
+}
+
+.flow-step.lit { opacity: 1; }
+.flow-step.user-step { color: var(--amber); background: rgba(251,191,36,0.1); }
+.flow-step.kernel-step { color: var(--purple); background: rgba(168,85,247,0.1); }
+.flow-arrow { color: var(--text3); font-size: 12px; }
+
+.syscall-desc-box {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.syscall-desc-name {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--green);
+  margin-bottom: 4px;
+}
+
+.syscall-desc-sig {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  margin-bottom: 8px;
+}
+
+.syscall-desc-text {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+
+/* ─────────────────────────────────────────
+   4. OS STRUCTURE EXPLORER
+───────────────────────────────────────── */
+.structure-tab-content {
+  display: none;
+}
+.structure-tab-content.active { display: block; }
+
+.layer-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 16px 0;
+}
+
+.layer-item {
+  padding: 12px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid transparent;
+}
+
+.layer-item:hover {
+  filter: brightness(1.2);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.layer-item.selected {
+  border-color: rgba(255,255,255,0.2);
+  filter: brightness(1.3);
+}
+
+.layer-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.layer-sub {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.layer-tooltip {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.6;
+  display: none;
+}
+
+.layer-tooltip.show { display: block; }
+
+.os-example-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.os-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid;
+}
+
+/* ─────────────────────────────────────────
+   5. OS TYPES
+───────────────────────────────────────── */
+.os-types-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.os-type-card {
+  perspective: 1000px;
+  height: 180px;
+  cursor: pointer;
+}
+
+.os-type-inner {
+  width: 100%; height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.os-type-card.flipped .os-type-inner {
+  transform: rotateY(180deg);
+}
+
+.os-type-front, .os-type-back {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  padding: 20px;
+  backface-visibility: hidden;
+  border: 1px solid var(--border);
+}
+
+.os-type-front {
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.os-type-back {
+  background: var(--bg3);
+  transform: rotateY(180deg);
+}
+
+.os-type-emoji { font-size: 32px; margin-bottom: 10px; }
+
+.os-type-name {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.os-type-year {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+}
+
+.os-type-flip-hint {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text3);
+  margin-top: 8px;
+  letter-spacing: 1px;
+}
+
+.os-type-back-title {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.os-type-back-def {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.os-type-back-eg {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+}
+
+/* Timeline */
+.timeline {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  margin: 24px 0;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.timeline-item {
+  flex: 1;
+  min-width: 100px;
+  text-align: center;
+  position: relative;
+}
+
+.timeline-item::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  right: -50%;
+  height: 1px;
+  background: var(--border);
+}
+.timeline-item:last-child::after { display: none; }
+
+.timeline-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--cyan);
+  background: var(--bg);
+  margin: 0 auto 6px;
+  position: relative;
+  z-index: 1;
+}
+
+.timeline-year {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--cyan);
+  margin-bottom: 4px;
+}
+
+.timeline-label {
+  font-size: 11px;
+  color: var(--text2);
+}
+
+/* ─────────────────────────────────────────
+   OS OBJECTIVES SECTION
+───────────────────────────────────────── */
+.objectives-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.objective-card {
+  padding: 16px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.objective-card:hover {
+  border-color: rgba(0,212,255,0.25);
+  background: rgba(0,212,255,0.03);
+}
+
+.objective-icon { font-size: 22px; margin-bottom: 8px; }
+
+.objective-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.objective-desc {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+
+/* ── MOBILE ── */
+#menu-toggle {
+  display: none;
+  position: fixed;
+  top: 16px; right: 16px;
+  z-index: 200;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 40px; height: 40px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  #sidebar {
+    transform: translateX(-100%);
+  }
+  #sidebar.open {
+    transform: translateX(0);
+  }
+  #main {
+    margin-left: 0;
+  }
+  #menu-toggle {
+    display: flex;
+  }
+  .section {
+    padding: 40px 20px;
+  }
+  #hero {
+    padding: 60px 20px 30px;
+  }
+  .hero-title {
+    font-size: 28px;
+  }
+  .multi-grid {
+    grid-template-columns: 1fr;
+  }
+  .syscall-layout {
+    grid-template-columns: 1fr;
+  }
+  .grid-2, .grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+/* ── TOOLTIP ── */
+.tooltip-trigger { position: relative; cursor: help; }
+.tooltip-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text2);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 50;
+}
+.tooltip-trigger:hover .tooltip-bubble { opacity: 1; }
+
+/* animation helpers */
+@keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+.fade-in { animation: fadeIn 0.3s ease forwards; }
+
+@keyframes pulse-green {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,255,136,0); }
+  50% { box-shadow: 0 0 0 6px rgba(0,255,136,0.1); }
+}
+.pulse-green { animation: pulse-green 2s ease-in-out infinite; }
+</style>
+</head>
+<body>
+  <!-- GLOBAL OS MODULES NAV BAR -->
+  <div style="background: rgba(10,10,20,0.95); border-bottom: 1px solid rgba(0,212,255,0.12); padding: 12px 20px; display: flex; gap: 16px; align-items: center; font-family: 'Syne', sans-serif; width: 100%; z-index: 10000; position: relative; box-sizing: border-box;">
+    <span style="color: #00d4ff; font-weight: 700; font-size: 16px; letter-spacing: 1px;">▶ OS MODULES</span>
+    <a href="osmod1.html" style="text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #00ff88; background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3); box-shadow: 0 0 10px rgba(0,255,136,0.2);">Module 1: Intro</a>
+    <a href="osmod2.html" style="text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #94a3b8; background: transparent; border: 1px solid transparent;">Module 2: Process & Scheduling</a>
+    <a href="index.html" style="text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #94a3b8; background: transparent; border: 1px solid transparent;">Module 3: IPC & Sync</a>
+  </div>
+
+<button id="menu-toggle" onclick="toggleSidebar()">☰</button>
+
+<!-- SIDEBAR -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-text">CSE301 · Module I</div>
+    <div class="logo-title">OS Fundamentals</div>
+  </div>
+  <div class="progress-bar-wrap">
+    <div class="progress-label">
+      <span>Explored</span>
+      <span id="progress-count">0 / 7</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="main-progress"></div>
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Concepts</div>
+    <a class="nav-item" href="#section-boot"><span class="nav-icon">🖥️</span> Boot Sequence <span class="nav-explored"></span></a>
+    <a class="nav-item" href="#section-objectives"><span class="nav-icon">⚙️</span> OS Objectives <span class="nav-explored"></span></a>
+    <a class="nav-item" href="#section-structure"><span class="nav-icon">🏗️</span> OS Structure <span class="nav-explored"></span></a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Simulators</div>
+    <a class="nav-item" href="#section-multi"><span class="nav-icon">⚡</span> Multi* Visual <span class="nav-explored"></span></a>
+    <a class="nav-item" href="#section-syscall"><span class="nav-icon">🔧</span> System Calls <span class="nav-explored"></span></a>
+    <a class="nav-item" href="#section-types"><span class="nav-icon">📋</span> OS Types <span class="nav-explored"></span></a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Services</div>
+    <a class="nav-item" href="#section-services"><span class="nav-icon">🌐</span> OS Services <span class="nav-explored"></span></a>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div id="main">
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-badge">▶ INTERACTIVE SIMULATOR</div>
+  <h1 class="hero-title">Module I: Fundamentals<br>of Operating Systems</h1>
+  <p class="hero-sub">Explore boot sequences, process scheduling, system calls, OS architectures, and more — through live, interactive simulators.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><span>7</span> Topics Covered</div>
+    <div class="hero-stat"><span>5</span> Live Simulators</div>
+    <div class="hero-stat"><span>∞</span> Things to click</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════
+     SECTION 1: BOOT SEQUENCE
+════════════════════════════════════════ -->
+<section class="section" id="section-boot" data-section="0">
+  <div class="section-header">
+    <div class="section-icon">🖥️</div>
+    <div>
+      <div class="section-num">01 · System Boot</div>
+      <h2 class="section-title">Boot Sequence Animator</h2>
+      <p class="section-desc">Step through each phase from power-on to user login — click any step for deep detail.</p>
+    </div>
+  </div>
+
+  <div class="boot-controls">
+    <button class="btn btn-green" onclick="bootAutoPlay()"><i class="fa fa-play" style="margin-right:6px"></i>Auto Play</button>
+    <button class="btn btn-cyan" onclick="bootReset()"><i class="fa fa-rotate-left" style="margin-right:6px"></i>Reset</button>
+    <button class="btn btn-amber" onclick="bootNext()"><i class="fa fa-forward-step" style="margin-right:6px"></i>Next Step</button>
+    <label class="toggle-wrap" onclick="toggleSlowMode()">
+      <div class="toggle" id="slow-toggle"></div>
+      <span>Slow Mode (2s delay)</span>
+    </label>
+    <div class="boot-status" id="boot-status">
+      <span class="blink">█</span> SYSTEM READY
+    </div>
+  </div>
+
+  <div class="boot-progress-bar">
+    <div class="boot-progress-fill" id="boot-progress"></div>
+  </div>
+
+  <div id="boot-timeline" class="boot-steps">
+    <!-- Steps rendered by JS -->
+  </div>
+
+  <div class="info-box">
+    <div class="info-box-title"><i class="fa fa-circle-info"></i> What's Actually Happening?</div>
+    Boot sequence is the <strong>initialization process</strong> that transforms a powered-off machine into a running operating system. Each stage hands control to the next, checking hardware, loading firmware, then progressively loading the OS kernel and user environment. Modern UEFI boot is significantly faster than legacy BIOS because it can initialize hardware in parallel.
+  </div>
+
+  <div class="fun-fact">
+    <div class="fun-fact-label">⚡ Real World</div>
+    Linux systems using systemd can boot in under <strong>2 seconds</strong> with an NVMe SSD. The original IBM PC (1981) took 30+ seconds just for POST. Android devices use a specialized init system optimized for embedded hardware constraints.
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════
+     SECTION 2: OBJECTIVES
+════════════════════════════════════════ -->
+<section class="section" id="section-objectives" data-section="1">
+  <div class="section-header">
+    <div class="section-icon">⚙️</div>
+    <div>
+      <div class="section-num">02 · OS Fundamentals</div>
+      <h2 class="section-title">Objectives & Functions of OS</h2>
+      <p class="section-desc">The operating system acts as a bridge between user applications and hardware.</p>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:20px">
+    <div class="card">
+      <div class="card-title">Primary Objectives</div>
+      <div class="objectives-grid">
+        <div class="objective-card">
+          <div class="objective-icon">🎯</div>
+          <div class="objective-title">Convenience</div>
+          <div class="objective-desc">Make computer easy to use. Hide hardware complexity from users.</div>
+        </div>
+        <div class="objective-card">
+          <div class="objective-icon">⚡</div>
+          <div class="objective-title">Efficiency</div>
+          <div class="objective-desc">Use hardware resources (CPU, memory, I/O) efficiently.</div>
+        </div>
+        <div class="objective-card">
+          <div class="objective-icon">🔒</div>
+          <div class="objective-title">Security</div>
+          <div class="objective-desc">Protect user data and prevent unauthorized access.</div>
+        </div>
+        <div class="objective-card">
+          <div class="objective-icon">📊</div>
+          <div class="objective-title">Evolution</div>
+          <div class="objective-desc">Allow effective development and testing of new systems.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Core Functions</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:var(--bg3);border-radius:8px">
+          <span style="color:var(--green);font-size:18px;margin-top:2px">◈</span>
+          <div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:2px">Process Management</div>
+            <div style="font-size:12px;color:var(--text2)">Create, schedule, terminate processes. Handle inter-process communication.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:var(--bg3);border-radius:8px">
+          <span style="color:var(--cyan);font-size:18px;margin-top:2px">◈</span>
+          <div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:2px">Memory Management</div>
+            <div style="font-size:12px;color:var(--text2)">Allocate/deallocate memory, handle virtual memory & paging.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:var(--bg3);border-radius:8px">
+          <span style="color:var(--amber);font-size:18px;margin-top:2px">◈</span>
+          <div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:2px">File System Management</div>
+            <div style="font-size:12px;color:var(--text2)">Create, delete, read, write files. Manage directories and permissions.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:var(--bg3);border-radius:8px">
+          <span style="color:var(--purple);font-size:18px;margin-top:2px">◈</span>
+          <div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:2px">I/O Device Management</div>
+            <div style="font-size:12px;color:var(--text2)">Control device drivers. Provide uniform I/O interface to applications.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">OS as Resource Manager — The Kernel's View</div>
+    <div style="display:flex;align-items:center;gap:0;margin-top:8px;overflow-x:auto">
+      <div style="text-align:center;padding:12px 16px;min-width:100px">
+        <div style="font-size:22px;margin-bottom:6px">👤</div>
+        <div style="font-size:12px;font-weight:700">User Apps</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">Python, Chrome, VSCode</div>
+      </div>
+      <div style="color:var(--text3);font-size:20px;flex-shrink:0">→</div>
+      <div style="text-align:center;padding:12px 16px;min-width:120px;background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.2);border-radius:8px">
+        <div style="font-size:22px;margin-bottom:6px">🧠</div>
+        <div style="font-size:12px;font-weight:700;color:var(--green)">OS Kernel</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">Resource manager</div>
+      </div>
+      <div style="color:var(--text3);font-size:20px;flex-shrink:0">→</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="padding:6px 12px;background:var(--bg3);border-radius:6px;font-size:12px;text-align:center">💾 CPU</div>
+        <div style="padding:6px 12px;background:var(--bg3);border-radius:6px;font-size:12px;text-align:center">🗃️ RAM</div>
+        <div style="padding:6px 12px;background:var(--bg3);border-radius:6px;font-size:12px;text-align:center">💿 Disk</div>
+        <div style="padding:6px 12px;background:var(--bg3);border-radius:6px;font-size:12px;text-align:center">📡 I/O</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fun-fact">
+    <div class="fun-fact-label">💡 Fun Fact</div>
+    The Linux kernel has over <strong>27 million lines of code</strong> and ~4,000 active contributors. Despite this, its core scheduler that allocates CPU time runs in just microseconds per decision.
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════
+     SECTION 3: MULTI* VISUAL
+════════════════════════════════════════ -->
+<section class="section" id="section-multi" data-section="3">
+  <div class="section-header">
+    <div class="section-icon">⚡</div>
+    <div>
+      <div class="section-num">05 · Concurrent Execution</div>
+      <h2 class="section-title">Multiprogramming vs Multitasking vs Multithreading</h2>
+      <p class="section-desc">See live animated differences — add processes to watch behavior change.</p>
+    </div>
+  </div>
+
+  <div class="multi-grid" id="multi-grid">
+    <!-- Panel 1: Multiprogramming -->
+    <div class="multi-panel">
+      <div class="multi-panel-header">
+        <div class="multi-panel-title" style="color:var(--green)">Multiprogramming</div>
+        <div class="multi-panel-sub">CPU switches on I/O block · No preemption</div>
+      </div>
+      <div class="multi-panel-body" id="mp-body">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:8px;letter-spacing:0.5px">CPU UTILIZATION TIMELINE</div>
+        <div id="mp-bars"></div>
+        <div class="mp-legend" id="mp-legend"></div>
+        <div style="margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--text3)">
+          CPU Efficiency: <span id="mp-efficiency" style="color:var(--green)">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel 2: Multitasking -->
+    <div class="multi-panel">
+      <div class="multi-panel-header">
+        <div class="multi-panel-title" style="color:var(--cyan)">Multitasking</div>
+        <div class="multi-panel-sub">Time-sliced · Preemptive scheduling</div>
+      </div>
+      <div class="multi-panel-body" id="mt-body">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:8px;letter-spacing:0.5px">GANTT CHART (20ms quantum)</div>
+        <div id="gantt-rows"></div>
+      </div>
+    </div>
+
+    <!-- Panel 3: Multithreading -->
+    <div class="multi-panel">
+      <div class="multi-panel-header">
+        <div class="multi-panel-title" style="color:var(--purple)">Multithreading</div>
+        <div class="multi-panel-sub">Threads share process memory</div>
+      </div>
+      <div class="multi-panel-body" id="mth-body">
+        <div id="thread-vis"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="multi-controls">
+    <button class="btn btn-green" onclick="addProcess()"><i class="fa fa-plus" style="margin-right:6px"></i>Add Process</button>
+    <button class="btn btn-cyan" onclick="removeProcess()"><i class="fa fa-minus" style="margin-right:6px"></i>Remove Process</button>
+    <span style="font-family:var(--mono);font-size:12px;color:var(--text3)">Processes: <span id="proc-count" style="color:var(--cyan)">3</span></span>
+  </div>
+
+  <div class="grid-2" style="margin-top:16px">
+    <div class="info-box">
+      <div class="info-box-title"><i class="fa fa-circle-info"></i> Key Differences</div>
+      <strong>Multiprogramming:</strong> Multiple programs in memory. CPU switches only when a program does I/O (cooperative). Goal: maximize CPU utilization.<br><br>
+      <strong>Multitasking:</strong> CPU switches rapidly between processes (preemptive, every ~20ms). Gives illusion of parallelism. What you use daily.<br><br>
+      <strong>Multithreading:</strong> One process with multiple threads sharing code/data space. Threads are lighter than processes.
+    </div>
+    <div class="card">
+      <div class="card-title">Quick Comparison</div>
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:600">Feature</th>
+            <th style="text-align:center;padding:6px 4px;color:var(--green)">M.Prog</th>
+            <th style="text-align:center;padding:6px 4px;color:var(--cyan)">M.Task</th>
+            <th style="text-align:center;padding:6px 4px;color:var(--purple)">M.Thread</th>
+          </tr>
+        </thead>
+        <tbody style="color:var(--text2)">
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+            <td style="padding:5px 8px">Switching trigger</td>
+            <td style="text-align:center;padding:5px 4px;color:var(--text3)">I/O wait</td>
+            <td style="text-align:center;padding:5px 4px;color:var(--text3)">Timer</td>
+            <td style="text-align:center;padding:5px 4px;color:var(--text3)">Yield/IO</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+            <td style="padding:5px 8px">Memory space</td>
+            <td style="text-align:center;padding:5px 4px;color:var(--text3)">Separate</td>
+            <td style="text-align:center;padding:5px 4px;color:var(--text3)">Separate</td>
+            <td style="text-align:center;padding:5px 4px;color:var(--text3)">Shared</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.04)">
+            <td style="padding:5px 8px">Context switch cost</td>
+            <td style="text-align:center;padding:5px 4px;color:var(--text3)">High</td>
+            <td style="text-align:center;padding:5px 4px;color:var(--text3)">Medium</td>
+            <td style="text-align:center;padding:5px 4px;color:var(--text3)">Low</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px">True parallelism</td>
+            <td style="text-align:center;padding:5px 4px">❌</td>
+            <td style="text-align:center;padding:5px 4px">❌</td>
+            <td style="text-align:center;padding:5px 4px">✅ (multi-core)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="fun-fact">
+    <div class="fun-fact-label">⚡ Real World</div>
+    A Chrome tab is a <strong>process</strong> (for isolation/security). Each service worker inside it is a <strong>thread</strong>. Chrome has used this architecture since 2008, making it crash-resistant — one tab dying doesn't kill others.
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════
+     SECTION 4: SYSTEM CALLS
+════════════════════════════════════════ -->
+<section class="section" id="section-syscall" data-section="4">
+  <div class="section-header">
+    <div class="section-icon">🔧</div>
+    <div>
+      <div class="section-num">07 · System Interface</div>
+      <h2 class="section-title">System Call Simulator</h2>
+      <p class="section-desc">Click a category, pick a call, watch the user→kernel mode switch happen.</p>
+    </div>
+  </div>
+
+  <div class="syscall-layout">
+    <div class="syscall-cats" id="syscall-cats">
+      <!-- rendered by JS -->
+    </div>
+    <div class="syscall-main">
+      <div class="mode-switch">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Mode Switch Visualization</div>
+        <div class="mode-layers">
+          <div class="mode-layer mode-layer-user" id="mode-user">
+            <div class="mode-label mode-user">User Mode</div>
+            <div class="mode-desc">Ring 3 · Restricted access</div>
+          </div>
+          <div class="mode-layer mode-layer-kernel" id="mode-kernel">
+            <div class="mode-label mode-kernel">Kernel Mode</div>
+            <div class="mode-desc">Ring 0 · Full hardware access</div>
+          </div>
+        </div>
+        <div class="syscall-flow" id="syscall-flow">
+          <span class="flow-step user-step" id="flow-0">User App</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step user-step" id="flow-1">Trap/INT</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step kernel-step" id="flow-2">Kernel</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step kernel-step" id="flow-3">Execute</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step user-step" id="flow-4">Return</span>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <div class="syscall-calls-grid" id="syscall-calls-grid"></div>
+        <div class="syscall-desc-box" id="syscall-desc-box">
+          <div class="syscall-desc-name" id="sc-name">Select a system call →</div>
+          <div class="syscall-desc-sig" id="sc-sig"></div>
+          <div class="syscall-desc-text" id="sc-desc">Click any system call above to see its signature, description, and watch the user↔kernel mode transition animate.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <div class="info-box-title"><i class="fa fa-circle-info"></i> What's Actually Happening?</div>
+    When an application calls <code style="color:var(--green);background:rgba(0,255,136,0.1);padding:1px 5px;border-radius:3px">read()</code>, the CPU executes a <strong>software interrupt</strong> (INT 0x80 on x86 or SYSCALL instruction). This flips the CPU privilege level from Ring 3 → Ring 0, the kernel validates arguments, performs the operation, then returns the result and switches back to Ring 3. This <em>mode switch</em> costs ~100-200 nanoseconds.
+  </div>
+
+  <div class="fun-fact">
+    <div class="fun-fact-label">🔢 Fun Fact</div>
+    Linux has <strong>~450 system calls</strong>. Windows has ~1,800 (though many are undocumented). The most frequently called syscall in any program? Probably <code style="color:var(--green)">mmap()</code> — memory mapping happens constantly. You can trace all syscalls a program makes with <code style="color:var(--green)">strace ./program</code>.
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════
+     SECTION 5: OS STRUCTURE EXPLORER
+════════════════════════════════════════ -->
+<section class="section" id="section-structure" data-section="2">
+  <div class="section-header">
+    <div class="section-icon">🏗️</div>
+    <div>
+      <div class="section-num">03 · Internal Architecture</div>
+      <h2 class="section-title">OS Structure Explorer</h2>
+      <p class="section-desc">Click layers to explore — see how different OS designs organize their internals.</p>
+    </div>
+  </div>
+
+  <div class="tabs" id="structure-tabs">
+    <div class="tab active" onclick="switchStructureTab('monolithic')">Monolithic</div>
+    <div class="tab" onclick="switchStructureTab('layered')">Layered</div>
+    <div class="tab" onclick="switchStructureTab('microkernel')">Microkernel</div>
+    <div class="tab" onclick="switchStructureTab('modular')">Modular</div>
+    <div class="tab" onclick="switchStructureTab('hybrid')">Hybrid</div>
+  </div>
+
+  <div id="structure-content">
+    <!-- rendered by JS -->
+  </div>
+
+  <div class="fun-fact">
+    <div class="fun-fact-label">🏆 Real World</div>
+    The <strong>Linux kernel</strong> is technically monolithic but supports loadable kernel modules — making it practically modular. <strong>macOS</strong> uses a hybrid XNU kernel combining Mach (microkernel) + BSD (monolithic) components. This is why macOS can run Unix programs natively!
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════
+     SECTION 6: OS TYPES
+════════════════════════════════════════ -->
+<section class="section" id="section-types" data-section="5">
+  <div class="section-header">
+    <div class="section-icon">📋</div>
+    <div>
+      <div class="section-num">06 · OS Classification</div>
+      <h2 class="section-title">Types of Operating Systems</h2>
+      <p class="section-desc">Click cards to flip and see definitions, use cases, and real-world examples.</p>
+    </div>
+  </div>
+
+  <div class="timeline" id="os-timeline"></div>
+
+  <div class="os-types-grid" id="os-types-grid"></div>
+
+  <div class="info-box">
+    <div class="info-box-title"><i class="fa fa-circle-info"></i> How to Choose an OS Type?</div>
+    The choice depends on <strong>timing constraints</strong>, <strong>resource availability</strong>, and <strong>use case</strong>. A hospital life-support system needs a <em>Hard Real-Time OS</em> (guaranteed response in microseconds). Your laptop uses a <em>Time-Sharing OS</em> (best-effort, interactive). A scientific computing cluster uses a <em>Distributed OS</em> (coordinate thousands of nodes). An embedded sensor uses a tiny <em>Embedded OS</em> that fits in kilobytes.
+  </div>
+
+  <div class="fun-fact">
+    <div class="fun-fact-label">🚀 Fun Fact</div>
+    The Mars Curiosity Rover runs <strong>VxWorks</strong>, a Real-Time OS. When it took its first drive, VxWorks had to handle commands with a 14-minute communication delay from Earth. The entire rover navigation runs autonomously with real-time safety constraints.
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════
+     SECTION 7: OS SERVICES
+════════════════════════════════════════ -->
+<section class="section" id="section-services" data-section="6">
+  <div class="section-header">
+    <div class="section-icon">🌐</div>
+    <div>
+      <div class="section-num">07 · OS Services</div>
+      <h2 class="section-title">Operating System Services</h2>
+      <p class="section-desc">Services provided to programs and users — the OS's public-facing API.</p>
+    </div>
+  </div>
+
+  <div id="services-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px"></div>
+
+  <div class="info-box" style="margin-top:24px">
+    <div class="info-box-title"><i class="fa fa-circle-info"></i> Services vs System Calls</div>
+    <strong>Services</strong> are high-level capabilities the OS provides (like "program execution" or "I/O operations"). <strong>System calls</strong> are the low-level mechanism used to request those services. Think of services as the <em>what</em> and system calls as the <em>how</em>. One service might require multiple system calls to implement.
+  </div>
+
+  <div class="fun-fact">
+    <div class="fun-fact-label">📖 Exam Tip</div>
+    OS services are often grouped into two categories: <strong>services for users</strong> (UI, program execution, I/O, file system, communication, error detection) and <strong>services for efficient system operation</strong> (resource allocation, accounting, protection, security).
+  </div>
+</section>
+
+</div><!-- /main -->
+
+<script>
+// ═══════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════
+const BOOT_STEPS = [
+  {
+    icon: '⚡', name: 'Power On',
+    time: 'T+0ms', tag: 'HARDWARE',
+    desc: 'Voltage regulators stabilize. Power Good signal sent to motherboard.',
+    detail: `> VCC rails: 3.3V, 5V, 12V stabilized
+> Power-Good signal: HIGH
+> CPU reset pin: deasserted
+> BIOS/UEFI chip activated`
+  },
+  {
+    icon: '🔬', name: 'BIOS/UEFI Init',
+    time: 'T+100ms', tag: 'FIRMWARE',
+    desc: 'Firmware initializes CPU, memory controller, and essential chipset components.',
+    detail: `> UEFI DXE (Driver Execution Env)
+> Memory controller init: DDR4/5
+> PCIe root complex init
+> SMM (System Mgmt Mode) setup`
+  },
+  {
+    icon: '🧪', name: 'POST',
+    time: 'T+500ms', tag: 'DIAGNOSTICS',
+    desc: 'Power-On Self Test: checks CPU, RAM, GPU, storage. Beep codes for failures.',
+    detail: `> CPU register test: PASS
+> RAM test (memcheck): 16GB OK
+> GPU BIOS: PASS
+> Storage controllers: detected
+> Beep code: 1 short = all OK`
+  },
+  {
+    icon: '📂', name: 'Bootloader',
+    time: 'T+1s', tag: 'LOADER',
+    desc: 'UEFI locates EFI System Partition. Loads GRUB/Windows Boot Manager into RAM.',
+    detail: `> ESP partition: /dev/nvme0n1p1
+> GRUB 2.06 loaded at 0x7C00
+> grub.cfg parsed
+> Kernel image: /boot/vmlinuz
+> initrd: /boot/initramfs.img`
+  },
+  {
+    icon: '🧠', name: 'Kernel Load',
+    time: 'T+2s', tag: 'KERNEL',
+    desc: 'Kernel decompresses into memory. Sets up virtual memory, interrupt tables.',
+    detail: `> Decompress vmlinuz → kernel
+> Setup IDT (Interrupt Table)
+> GDT (Global Desc Table): init
+> Paging enabled: 4-level PT
+> SMP init: 8 CPUs online
+> PCI bus scan: 42 devices`
+  },
+  {
+    icon: '🔧', name: 'Init / systemd',
+    time: 'T+3s', tag: 'USERSPACE',
+    desc: 'PID 1 starts. systemd reads unit files, mounts filesystems, starts services in parallel.',
+    detail: `> PID 1: /sbin/init (systemd)
+> Mounts: / /proc /sys /dev
+> Network: NetworkManager start
+> Services: 87 units activated
+> Target: graphical.target`
+  },
+  {
+    icon: '👤', name: 'User Login',
+    time: 'T+5s', tag: 'USER',
+    desc: 'Display manager shows login screen. User authenticates via PAM. Desktop session starts.',
+    detail: `> GDM (GNOME Display Manager)
+> PAM: /etc/pam.d/gdm-password
+> Session: gnome-session started
+> D-Bus: session bus up
+> Shell: bash PID 4521
+> ✓ SYSTEM READY`
+  }
+];
+
+const SYSCALL_CATEGORIES = [
+  {
+    name: 'Process Control', icon: '⚙️', color: 'var(--green)',
+    calls: [
+      { name: 'fork()', sig: 'pid_t fork(void)', desc: 'Creates an exact copy of the calling process. Returns 0 to child, child PID to parent. Used to spawn new processes.' },
+      { name: 'exec()', sig: 'int execve(const char *path, char *argv[], char *envp[])', desc: 'Replaces current process image with a new program. The process PID stays the same, but everything else changes.' },
+      { name: 'exit()', sig: 'void exit(int status)', desc: 'Terminates the calling process. Sends SIGCHLD to parent. Frees all resources, closes open file descriptors.' },
+      { name: 'wait()', sig: 'pid_t wait(int *status)', desc: 'Parent waits for any child process to finish. Prevents zombie processes from accumulating.' },
+      { name: 'getpid()', sig: 'pid_t getpid(void)', desc: 'Returns the Process ID of the calling process. Lightweight — often just reads a kernel variable.' },
+    ]
+  },
+  {
+    name: 'File Management', icon: '📁', color: 'var(--cyan)',
+    calls: [
+      { name: 'open()', sig: 'int open(const char *path, int flags)', desc: 'Opens a file and returns a file descriptor integer. Flags: O_RDONLY, O_WRONLY, O_CREAT, O_APPEND, etc.' },
+      { name: 'read()', sig: 'ssize_t read(int fd, void *buf, size_t count)', desc: 'Reads up to `count` bytes from file descriptor into buffer. Returns bytes actually read (may be less than count).' },
+      { name: 'write()', sig: 'ssize_t write(int fd, const void *buf, size_t count)', desc: 'Writes count bytes from buffer to file descriptor. Returns bytes written. fd=1 is stdout, fd=2 is stderr.' },
+      { name: 'close()', sig: 'int close(int fd)', desc: 'Closes a file descriptor, freeing the kernel resources. Always close what you open to prevent descriptor leaks!' },
+      { name: 'lseek()', sig: 'off_t lseek(int fd, off_t offset, int whence)', desc: 'Repositions the file offset. SEEK_SET=absolute, SEEK_CUR=relative, SEEK_END=from end.' },
+    ]
+  },
+  {
+    name: 'Device Management', icon: '🖨️', color: 'var(--amber)',
+    calls: [
+      { name: 'ioctl()', sig: 'int ioctl(int fd, unsigned long request, ...)', desc: 'Device-specific operations not covered by standard I/O. Used for terminal settings, network config, and hardware control.' },
+      { name: 'mmap()', sig: 'void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off)', desc: 'Maps a file or device into memory. Allows file I/O to happen via memory accesses — much faster than read/write.' },
+      { name: 'poll()', sig: 'int poll(struct pollfd *fds, nfds_t nfds, int timeout)', desc: 'Wait for events on multiple file descriptors simultaneously. Used in event-driven I/O (servers, GUIs).' },
+    ]
+  },
+  {
+    name: 'Information', icon: '📊', color: 'var(--purple)',
+    calls: [
+      { name: 'getuid()', sig: 'uid_t getuid(void)', desc: 'Returns the real user ID of the calling process. Used to check permissions and ownership.' },
+      { name: 'time()', sig: 'time_t time(time_t *tloc)', desc: 'Returns current time as seconds since Unix epoch (Jan 1, 1970). The foundation of all timestamps in Unix.' },
+      { name: 'uname()', sig: 'int uname(struct utsname *buf)', desc: 'Returns system information: OS name, hostname, kernel version, machine type.' },
+      { name: 'sysinfo()', sig: 'int sysinfo(struct sysinfo *info)', desc: 'Returns overall system statistics: uptime, RAM usage, CPU load averages, process count.' },
+    ]
+  },
+  {
+    name: 'Communication', icon: '📡', color: 'var(--red)',
+    calls: [
+      { name: 'socket()', sig: 'int socket(int domain, int type, int protocol)', desc: 'Creates a communication endpoint. domain=AF_INET (IPv4), type=SOCK_STREAM (TCP) or SOCK_DGRAM (UDP).' },
+      { name: 'pipe()', sig: 'int pipe(int pipefd[2])', desc: 'Creates a unidirectional data channel. pipefd[0]=read end, pipefd[1]=write end. Foundation of Unix pipelines (cmd1 | cmd2).' },
+      { name: 'send()', sig: 'ssize_t send(int sockfd, const void *buf, size_t len, int flags)', desc: 'Sends data through a socket. For TCP, may not send all bytes at once — check return value!' },
+      { name: 'shmget()', sig: 'int shmget(key_t key, size_t size, int shmflg)', desc: 'Gets a System V shared memory segment. Fastest IPC method — processes share the same physical memory pages.' },
+    ]
+  }
+];
+
+const STRUCTURE_DATA = {
+  monolithic: {
+    title: 'Monolithic Kernel',
+    desc: 'Entire OS runs in kernel space as a single large executable. All subsystems are tightly coupled.',
+    examples: [{ name: 'Linux', color: 'var(--green)' }, { name: 'Unix', color: 'var(--cyan)' }, { name: 'DOS', color: 'var(--amber)' }],
+    pros: 'Fast — no mode switches between components. Direct function calls.',
+    cons: 'A bug in any subsystem can crash the whole kernel.',
+    layers: [
+      { name: 'User Applications', bg: 'rgba(148,163,184,0.15)', color: 'var(--text)', sub: 'Shell, GUI apps, utilities' },
+      { name: 'System Call Interface', bg: 'rgba(0,212,255,0.15)', color: 'var(--cyan)', sub: 'open(), read(), fork(), socket()' },
+      { name: 'Kernel (Single Address Space)', bg: 'rgba(0,255,136,0.12)', color: 'var(--green)', sub: 'FS + MM + Sched + Drivers + IPC — all together' },
+      { name: 'Hardware Abstraction Layer', bg: 'rgba(251,191,36,0.12)', color: 'var(--amber)', sub: 'CPU, Memory, Interrupts' },
+      { name: 'Physical Hardware', bg: 'rgba(168,85,247,0.12)', color: 'var(--purple)', sub: 'CPU, RAM, Disk, Network' },
+    ]
+  },
+  layered: {
+    title: 'Layered Architecture',
+    desc: 'OS divided into numbered layers. Each layer only uses services from the layer below it.',
+    examples: [{ name: 'THE OS', color: 'var(--green)' }, { name: 'OS/2', color: 'var(--cyan)' }, { name: 'Multics', color: 'var(--amber)' }],
+    pros: 'Easy to debug layer by layer. Clean separation of concerns.',
+    cons: 'Performance overhead. Rigid — hard to know which layer functionality belongs to.',
+    layers: [
+      { name: 'Layer 5: User Programs', bg: 'rgba(148,163,184,0.12)', color: 'var(--text)', sub: 'Applications' },
+      { name: 'Layer 4: Buffering for I/O', bg: 'rgba(0,212,255,0.12)', color: 'var(--cyan)', sub: 'I/O management' },
+      { name: 'Layer 3: Operator-Process Comm', bg: 'rgba(0,255,136,0.12)', color: 'var(--green)', sub: 'Console I/O' },
+      { name: 'Layer 2: Memory Management', bg: 'rgba(251,191,36,0.12)', color: 'var(--amber)', sub: 'Virtual memory' },
+      { name: 'Layer 1: CPU Scheduling', bg: 'rgba(248,113,113,0.12)', color: 'var(--red)', sub: 'Process multiplexing' },
+      { name: 'Layer 0: Hardware', bg: 'rgba(168,85,247,0.12)', color: 'var(--purple)', sub: 'Physical devices' },
+    ]
+  },
+  microkernel: {
+    title: 'Microkernel',
+    desc: 'Only the most essential functions run in kernel mode. Everything else (drivers, FS) runs in user space as servers.',
+    examples: [{ name: 'MINIX 3', color: 'var(--green)' }, { name: 'QNX', color: 'var(--cyan)' }, { name: 'L4', color: 'var(--amber)' }, { name: 'GNU Hurd', color: 'var(--purple)' }],
+    pros: 'Highly stable — a crashed driver doesn\'t bring down the kernel. More secure.',
+    cons: 'Slower due to message passing overhead. Complex IPC mechanisms.',
+    layers: [
+      { name: 'User Space Servers', bg: 'rgba(0,212,255,0.12)', color: 'var(--cyan)', sub: 'File Server | Device Drivers | Network Server' },
+      { name: 'IPC (Message Passing)', bg: 'rgba(0,255,136,0.12)', color: 'var(--green)', sub: 'Communication between servers' },
+      { name: 'Microkernel (Tiny!)', bg: 'rgba(251,191,36,0.15)', color: 'var(--amber)', sub: 'IPC + Scheduling + Basic MM only' },
+      { name: 'Hardware', bg: 'rgba(168,85,247,0.12)', color: 'var(--purple)', sub: 'Physical devices' },
+    ]
+  },
+  modular: {
+    title: 'Modular Kernel',
+    desc: 'Core kernel with loadable modules. Best of monolithic (performance) and microkernel (modularity).',
+    examples: [{ name: 'Linux (LKM)', color: 'var(--green)' }, { name: 'Solaris', color: 'var(--cyan)' }, { name: 'macOS (kexts)', color: 'var(--amber)' }],
+    pros: 'Load modules at runtime without reboot. Keeps kernel lean.',
+    cons: 'Modules run in kernel space — a buggy module can still crash the system.',
+    layers: [
+      { name: 'User Applications', bg: 'rgba(148,163,184,0.12)', color: 'var(--text)', sub: 'Regular programs' },
+      { name: 'System Call Interface', bg: 'rgba(0,212,255,0.12)', color: 'var(--cyan)', sub: 'Stable API' },
+      { name: 'Core Kernel', bg: 'rgba(0,255,136,0.12)', color: 'var(--green)', sub: 'Essential services always loaded' },
+      { name: '⚡ Loadable Modules', bg: 'rgba(251,191,36,0.12)', color: 'var(--amber)', sub: 'Drivers, FS, Network — loaded on demand' },
+      { name: 'Hardware', bg: 'rgba(168,85,247,0.12)', color: 'var(--purple)', sub: 'Physical devices' },
+    ]
+  },
+  hybrid: {
+    title: 'Hybrid Kernel',
+    desc: 'Combines monolithic speed with microkernel structure. Some subsystems live in kernel, some in user space.',
+    examples: [{ name: 'Windows NT', color: 'var(--cyan)' }, { name: 'macOS (XNU)', color: 'var(--amber)' }, { name: 'DragonFlyBSD', color: 'var(--purple)' }],
+    pros: 'Balance of performance and reliability. Real-world pragmatic approach.',
+    cons: 'Design complexity. Not purely either paradigm — can have the drawbacks of both.',
+    layers: [
+      { name: 'User Mode (Win32/POSIX Subsystems)', bg: 'rgba(148,163,184,0.12)', color: 'var(--text)', sub: 'Applications & compatibility layers' },
+      { name: 'Executive Services (User-Space)', bg: 'rgba(0,212,255,0.12)', color: 'var(--cyan)', sub: 'Config, display driver (Win: CSRSS)' },
+      { name: 'NT Executive / XNU BSD Layer', bg: 'rgba(0,255,136,0.12)', color: 'var(--green)', sub: 'IO Manager, Object Manager, Security' },
+      { name: 'Microkernel Layer (Mach)', bg: 'rgba(251,191,36,0.12)', color: 'var(--amber)', sub: 'IPC + Thread scheduling + VM' },
+      { name: 'HAL / Hardware', bg: 'rgba(168,85,247,0.12)', color: 'var(--purple)', sub: 'Hardware Abstraction' },
+    ]
+  }
+};
+
+const OS_TYPES = [
+  { emoji:'📦', name:'Batch OS', year:'1950s', color:'var(--text2)', border:'var(--border)',
+    def:'Jobs submitted in batches without user interaction. CPU never idle waiting for user.',
+    usecase:'Payroll processing, bank statement generation',
+    example:'IBM OS/360, early mainframes' },
+  { emoji:'⏱️', name:'Time-Sharing', year:'1960s', color:'var(--cyan)', border:'rgba(0,212,255,0.3)',
+    def:'Multiple users share CPU time via rapid context switching (time quanta).',
+    usecase:'Multi-user servers, interactive terminals',
+    example:'UNIX, Multics, TSS/360' },
+  { emoji:'⚡', name:'Real-Time OS', year:'1970s', color:'var(--green)', border:'rgba(0,255,136,0.3)',
+    def:'Guaranteed response within strict time deadlines. Hard (crash if missed) or Soft.',
+    usecase:'Pacemakers, aircraft control, robotics',
+    example:'VxWorks, FreeRTOS, QNX, RTLinux' },
+  { emoji:'🌐', name:'Distributed OS', year:'1980s', color:'var(--amber)', border:'rgba(251,191,36,0.3)',
+    def:'Manages a collection of networked computers as a single coherent system.',
+    usecase:'Cloud computing, supercomputers, grid computing',
+    example:'Amoeba, Plan 9, Google Borg/K8s' },
+  { emoji:'📱', name:'Embedded OS', year:'1980s', color:'var(--purple)', border:'rgba(168,85,247,0.3)',
+    def:'Tiny OS for resource-constrained hardware. Often burned into ROM.',
+    usecase:'IoT sensors, smart appliances, cars',
+    example:'FreeRTOS, Zephyr, TinyOS, Arduino' },
+  { emoji:'🖥️', name:'Network OS', year:'1980s', color:'var(--red)', border:'rgba(248,113,113,0.3)',
+    def:'Provides network services. Each machine runs its own OS but shares resources.',
+    usecase:'File servers, print servers, corporate networks',
+    example:'Novell NetWare, Windows Server, NFS' },
+];
+
+const OS_TIMELINE = [
+  { year:'1955', label:'Batch OS' },
+  { year:'1964', label:'Time-Sharing' },
+  { year:'1970', label:'Unix' },
+  { year:'1978', label:'Real-Time' },
+  { year:'1981', label:'MS-DOS' },
+  { year:'1985', label:'Network OS' },
+  { year:'1991', label:'Linux 0.01' },
+  { year:'2000', label:'Distributed' },
+  { year:'2008', label:'Mobile/Cloud' },
+];
+
+const OS_SERVICES = [
+  { icon:'▶️', name:'Program Execution', color:'var(--green)', desc:'Load programs into memory, run them. Terminate normally or with error. Handle executable formats (ELF, PE, Mach-O).' },
+  { icon:'📡', name:'I/O Operations', color:'var(--cyan)', desc:'Programs need to perform I/O. OS provides a uniform interface regardless of the underlying device type.' },
+  { icon:'💾', name:'File System Manipulation', color:'var(--amber)', desc:'Create, delete, read, write, search files and directories. Manage permissions (rwx). Handle multiple FS types.' },
+  { icon:'🔗', name:'Communications', color:'var(--purple)', desc:'Inter-process communication via shared memory or message passing. Network communications via sockets.' },
+  { icon:'🚨', name:'Error Detection', color:'var(--red)', desc:'Detect hardware errors (bad RAM, disk failure), software errors (division by zero, segfault), and take corrective action.' },
+  { icon:'📊', name:'Resource Allocation', color:'var(--green)', desc:'Allocate CPU time, memory pages, device access fairly and efficiently among competing processes.' },
+  { icon:'📝', name:'Accounting', color:'var(--cyan)', desc:'Track which users use what resources for how long. Enables billing, quota enforcement, and performance tuning.' },
+  { icon:'🔒', name:'Protection & Security', color:'var(--amber)', desc:'Ensure all access to resources is controlled. Prevent unauthorized access. Authenticate users, enforce permissions.' },
+  { icon:'🖥️', name:'User Interface', color:'var(--purple)', desc:'CLI (bash, zsh), GUI (X11, Wayland), or API-only (embedded). The face of the OS.' },
+];
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let bootCurrentStep = -1;
+let bootPlaying = false;
+let bootSlowMode = false;
+let bootTimer = null;
+let processes = ['P1','P2','P3'];
+let processColors = ['rgba(0,255,136,0.7)','rgba(0,212,255,0.7)','rgba(251,191,36,0.7)','rgba(168,85,247,0.7)','rgba(248,113,113,0.7)'];
+let selectedSyscatIdx = 0;
+let selectedSyscall = null;
+let exploredSections = new Set();
+let syscallAnimTimer = null;
+let ganttTimer = null;
+let currentStructureTab = 'monolithic';
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  renderBootSteps();
+  renderSyscallCats();
+  renderSyscallCalls(0);
+  renderStructure('monolithic');
+  renderOsTypes();
+  renderTimeline();
+  renderServices();
+  renderMulti();
+  setupIntersectionObserver();
+  updateProgress();
+});
+
+// ── PROGRESS ──
+function updateProgress() {
+  const total = 7;
+  const count = exploredSections.size;
+  document.getElementById('progress-count').textContent = `${count} / ${total}`;
+  document.getElementById('main-progress').style.width = `${(count/total)*100}%`;
+  // mark nav items
+  document.querySelectorAll('.nav-item').forEach((el, i) => {
+    if(exploredSections.has(i)) el.classList.add('explored');
+  });
+}
+
+function setupIntersectionObserver() {
+  const sections = document.querySelectorAll('[data-section]');
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting) {
+        const idx = parseInt(e.target.dataset.section);
+        exploredSections.add(idx);
+        updateProgress();
+        // highlight nav
+        const href = '#' + e.target.id;
+        document.querySelectorAll('.nav-item').forEach(n => {
+          n.classList.toggle('active', n.getAttribute('href') === href);
+        });
+      }
+    });
+  }, { threshold: 0.2 });
+  sections.forEach(s => obs.observe(s));
+}
+
+// ─────────────────────────────────────────
+// BOOT SEQUENCE
+// ─────────────────────────────────────────
+function renderBootSteps() {
+  const container = document.getElementById('boot-timeline');
+  container.innerHTML = BOOT_STEPS.map((s, i) => `
+    <div class="boot-step" id="boot-step-${i}" onclick="bootClickStep(${i})">
+      <div class="boot-step-icon">${s.icon}</div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+          <div class="boot-step-name">${s.name}</div>
+          <span class="tag tag-cyan">${s.tag}</span>
+        </div>
+        <div class="boot-step-time">${s.time}</div>
+        <div class="boot-step-desc">${s.desc}</div>
+        <div class="boot-step-detail">${s.detail}</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text3)">${Math.round((i/6)*100)}%</div>
+    </div>
+  `).join('');
+}
+
+function bootClickStep(i) {
+  bootSetStep(i);
+}
+
+function bootSetStep(i) {
+  BOOT_STEPS.forEach((_, idx) => {
+    const el = document.getElementById(`boot-step-${idx}`);
+    el.classList.remove('active','done');
+    if(idx < i) el.classList.add('done');
+    if(idx === i) el.classList.add('active');
+  });
+  const pct = Math.round(((i+1)/BOOT_STEPS.length)*100);
+  document.getElementById('boot-progress').style.width = pct + '%';
+  bootCurrentStep = i;
+  const st = document.getElementById('boot-status');
+  if(i < BOOT_STEPS.length - 1) {
+    st.innerHTML = `<span class="blink">█</span> ${BOOT_STEPS[i].tag} PHASE`;
+  } else {
+    st.innerHTML = `<span style="color:var(--green)">✓</span> BOOT COMPLETE`;
+  }
+}
+
+function bootNext() {
+  const next = bootCurrentStep + 1;
+  if(next < BOOT_STEPS.length) bootSetStep(next);
+}
+
+function bootReset() {
+  clearTimeout(bootTimer);
+  bootPlaying = false;
+  bootCurrentStep = -1;
+  document.getElementById('boot-progress').style.width = '0%';
+  BOOT_STEPS.forEach((_, i) => {
+    const el = document.getElementById(`boot-step-${i}`);
+    el.classList.remove('active','done');
+  });
+  document.getElementById('boot-status').innerHTML = `<span class="blink">█</span> SYSTEM READY`;
+}
+
+function bootAutoPlay() {
+  bootReset();
+  bootPlaying = true;
+  const delay = bootSlowMode ? 2200 : 700;
+  function step(i) {
+    if(i >= BOOT_STEPS.length) { bootPlaying = false; return; }
+    bootSetStep(i);
+    bootTimer = setTimeout(() => step(i+1), delay);
+  }
+  bootTimer = setTimeout(() => step(0), 300);
+}
+
+function toggleSlowMode() {
+  bootSlowMode = !bootSlowMode;
+  document.getElementById('slow-toggle').classList.toggle('on', bootSlowMode);
+}
+
+// ─────────────────────────────────────────
+// MULTIPROGRAMMING / MULTITASKING / MULTITHREADING
+// ─────────────────────────────────────────
+function renderMulti() {
+  renderMProgramming();
+  renderMTasking();
+  renderMThreading();
+  document.getElementById('proc-count').textContent = processes.length;
+}
+
+function renderMProgramming() {
+  const container = document.getElementById('mp-bars');
+  if(!container) return;
+  const colors = processColors;
+  // Simulate: each process alternates CPU/IO phases
+  const timeline = [];
+  const procs = processes.slice(0, 5);
+  let phases = procs.map((p, i) => ({
+    proc: p,
+    phases: Array.from({length:6}, (_, j) => j%2===0
+      ? {type:'cpu', dur: 10 + Math.floor(Math.random()*15)}
+      : {type:'io', dur: 8 + Math.floor(Math.random()*12)}
+    )
+  }));
+  // Build CPU timeline
+  const cpuTimeline = [];
+  let time = 0;
+  const maxTime = 100;
+  while(time < maxTime) {
+    let found = false;
+    for(let pi = 0; pi < phases.length; pi++) {
+      const proc = phases[pi];
+      if(!proc.phases.length) continue;
+      const ph = proc.phases[0];
+      if(ph.type === 'cpu') {
+        const take = Math.min(ph.dur, maxTime - time);
+        cpuTimeline.push({proc: proc.proc, type:'cpu', dur: take, pct: take, color: colors[pi]});
+        ph.dur -= take;
+        if(ph.dur <= 0) proc.phases.shift();
+        time += take;
+        found = true;
+        break;
+      }
+    }
+    if(!found) {
+      // All blocked on IO
+      cpuTimeline.push({proc:'IDLE', type:'idle', dur: 5, pct: 5, color:'rgba(100,116,139,0.3)'});
+      time += 5;
+      // advance io phases
+      phases.forEach(proc => {
+        if(proc.phases.length && proc.phases[0].type === 'io') {
+          proc.phases[0].dur -= 5;
+          if(proc.phases[0].dur <= 0) proc.phases.shift();
+        }
+      });
+    }
+  }
+  const total = cpuTimeline.reduce((s,x)=>s+x.pct,0)||100;
+  const busyPct = Math.round(cpuTimeline.filter(x=>x.type==='cpu').reduce((s,x)=>s+x.pct,0)/total*100);
+  container.innerHTML = `
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:4px">Memory: ${procs.map((p,i)=>`<span style="color:${colors[i]}">${p}</span>`).join(' ')}</div>
+    <div class="mp-cpu-bar">${cpuTimeline.map(x=>`<div class="mp-seg" style="width:${x.pct/total*100}%;background:${x.color};color:${x.type==='idle'?'var(--text3)':'rgba(0,0,0,0.7)'}">
+      ${x.pct > 6 ? (x.type==='idle'?'IDLE':x.proc) : ''}</div>`).join('')}
+    </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:6px">CPU efficiency: <span style="color:var(--green)">${busyPct}%</span></div>
+    <div class="mp-legend">
+      ${procs.map((p,i)=>`<div class="mp-legend-item"><div class="mp-legend-dot" style="background:${colors[i]}"></div>${p}</div>`).join('')}
+      <div class="mp-legend-item"><div class="mp-legend-dot" style="background:rgba(100,116,139,0.3)"></div>IDLE</div>
+    </div>
+  `;
+}
+
+function renderMTasking() {
+  const container = document.getElementById('gantt-rows');
+  if(!container) return;
+  const colors = processColors;
+  const procs = processes.slice(0,5);
+  const quant = 20;
+  const slots = 8;
+  // Round-robin scheduling
+  const assignments = [];
+  for(let i=0;i<slots;i++) assignments.push(procs[i % procs.length]);
+  container.innerHTML = procs.map((p, pi) => {
+    const blocks = assignments.map((a, si) => ({ active: a===p, slot: si }));
+    return `<div class="gantt-row">
+      <div class="gantt-label">${p}</div>
+      <div class="gantt-track">
+        ${blocks.map(b => `<div class="gantt-block" style="
+          left:${b.slot/slots*100}%;
+          width:${1/slots*100 - 0.5}%;
+          background:${b.active ? colors[pi] : 'transparent'};
+          ${b.active ? `animation: ganttPulse ${1.5+pi*0.3}s ease-in-out infinite alternate; animation-delay:${b.slot*0.2}s` : ''}
+        "></div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  // Add CSS for gantt animation
+  if(!document.getElementById('gantt-style')) {
+    const s = document.createElement('style');
+    s.id = 'gantt-style';
+    s.textContent = '@keyframes ganttPulse { from{opacity:0.5} to{opacity:1} }';
+    document.head.appendChild(s);
+  }
+  container.innerHTML += `<div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:8px">
+    Time quanta: ${quant}ms · ${slots} time slots shown · Round-Robin policy
+  </div>`;
+}
+
+function renderMThreading() {
+  const container = document.getElementById('thread-vis');
+  if(!container) return;
+  const procs = processes.slice(0,Math.min(processes.length,3));
+  const threadColors = ['var(--purple)','rgba(168,85,247,0.6)','rgba(168,85,247,0.4)'];
+  container.innerHTML = procs.map((p, pi) => `
+    <div class="thread-process">
+      <div class="thread-process-label">PROCESS: ${p} (PID: ${1000+pi})</div>
+      <div class="thread-lanes">
+        ${[1,2,3].map((t,ti) => `
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+            <span style="font-family:var(--mono);font-size:9px;color:var(--text3);width:40px">T${ti+1}</span>
+            <div class="thread-lane" style="flex:1">
+              <div class="thread-pulse" style="background:${threadColors[ti]};animation-delay:${(pi*0.7+ti*0.4)}s;animation-duration:${1.5+ti*0.5}s"></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:4px">
+        Shared: Code + Data + Heap &nbsp;|&nbsp; Private: Stack × 3
+      </div>
+    </div>
+  `).join('');
+}
+
+function addProcess() {
+  if(processes.length >= 5) return;
+  const idx = processes.length + 1;
+  processes.push(`P${idx}`);
+  renderMulti();
+}
+
+function removeProcess() {
+  if(processes.length <= 1) return;
+  processes.pop();
+  renderMulti();
+}
+
+// ─────────────────────────────────────────
+// SYSTEM CALLS
+// ─────────────────────────────────────────
+function renderSyscallCats() {
+  const container = document.getElementById('syscall-cats');
+  container.innerHTML = SYSCALL_CATEGORIES.map((cat, i) => `
+    <div class="syscall-cat ${i===0?'active':''}" onclick="selectSyscallCat(${i})">
+      <div class="syscall-cat-icon">${cat.icon}</div>
+      <div class="syscall-cat-name" style="color:${cat.color}">${cat.name}</div>
+      <div class="syscall-cat-count">${cat.calls.length} calls</div>
+    </div>
+  `).join('');
+}
+
+function selectSyscallCat(i) {
+  selectedSyscatIdx = i;
+  selectedSyscall = null;
+  document.querySelectorAll('.syscall-cat').forEach((el, idx) => {
+    el.classList.toggle('active', idx === i);
+  });
+  renderSyscallCalls(i);
+  resetModeSwitch();
+}
+
+function renderSyscallCalls(catIdx) {
+  const cat = SYSCALL_CATEGORIES[catIdx];
+  const container = document.getElementById('syscall-calls-grid');
+  container.innerHTML = cat.calls.map((c, i) => `
+    <div class="syscall-chip" onclick="selectSyscall(${catIdx}, ${i})" id="sc-chip-${catIdx}-${i}">${c.name}</div>
+  `).join('');
+  document.getElementById('sc-name').textContent = `${cat.icon} ${cat.name} — Select a call →`;
+  document.getElementById('sc-sig').textContent = '';
+  document.getElementById('sc-desc').textContent = 'Click any system call above to see its signature, description, and watch the user↔kernel mode transition animate.';
+}
+
+function selectSyscall(catIdx, callIdx) {
+  const call = SYSCALL_CATEGORIES[catIdx].calls[callIdx];
+  document.querySelectorAll('.syscall-chip').forEach(c => c.classList.remove('active'));
+  const chip = document.getElementById(`sc-chip-${catIdx}-${callIdx}`);
+  if(chip) chip.classList.add('active');
+  document.getElementById('sc-name').textContent = call.name;
+  document.getElementById('sc-sig').textContent = call.sig;
+  document.getElementById('sc-desc').textContent = call.desc;
+  animateModeSwitch();
+}
+
+function animateModeSwitch() {
+  clearInterval(syscallAnimTimer);
+  const steps = [0,1,2,3,4];
+  const userSteps = [0,1,4];
+  const kernelSteps = [2,3];
+  // reset
+  steps.forEach(i => document.getElementById(`flow-${i}`).classList.remove('lit'));
+  document.getElementById('mode-user').className = 'mode-layer mode-layer-user';
+  document.getElementById('mode-kernel').className = 'mode-layer mode-layer-kernel';
+  let idx = 0;
+  syscallAnimTimer = setInterval(() => {
+    if(idx > 0) document.getElementById(`flow-${idx-1}`).classList.remove('lit');
+    if(idx >= steps.length) { clearInterval(syscallAnimTimer); return; }
+    const step = document.getElementById(`flow-${idx}`);
+    step.classList.add('lit');
+    const modeUser = document.getElementById('mode-user');
+    const modeKernel = document.getElementById('mode-kernel');
+    if(kernelSteps.includes(idx)) {
+      modeKernel.className = 'mode-layer mode-layer-kernel highlighted-kernel';
+      modeUser.className = 'mode-layer mode-layer-user';
+    } else {
+      modeUser.className = 'mode-layer mode-layer-user highlighted-user';
+      modeKernel.className = 'mode-layer mode-layer-kernel';
+    }
+    idx++;
+  }, 500);
+}
+
+function resetModeSwitch() {
+  clearInterval(syscallAnimTimer);
+  for(let i=0;i<5;i++) document.getElementById(`flow-${i}`).classList.remove('lit');
+  document.getElementById('mode-user').className = 'mode-layer mode-layer-user';
+  document.getElementById('mode-kernel').className = 'mode-layer mode-layer-kernel';
+}
+
+// ─────────────────────────────────────────
+// OS STRUCTURE
+// ─────────────────────────────────────────
+function switchStructureTab(tab) {
+  currentStructureTab = tab;
+  document.querySelectorAll('#structure-tabs .tab').forEach((el, i) => {
+    const tabs = ['monolithic','layered','microkernel','modular','hybrid'];
+    el.classList.toggle('active', tabs[i] === tab);
+  });
+  renderStructure(tab);
+}
+
+function renderStructure(tab) {
+  const data = STRUCTURE_DATA[tab];
+  const container = document.getElementById('structure-content');
+  container.innerHTML = `
+    <div class="fade-in">
+      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:20px">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px">${data.title}</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6">${data.desc}</div>
+          <div style="font-size:12px;margin-bottom:4px"><span style="color:var(--green)">✓ Pro:</span> <span style="color:var(--text2)">${data.pros}</span></div>
+          <div style="font-size:12px"><span style="color:var(--red)">✗ Con:</span> <span style="color:var(--text2)">${data.cons}</span></div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:6px;letter-spacing:1px">REAL-WORLD EXAMPLES</div>
+          <div class="os-example-chips">
+            ${data.examples.map(e => `<div class="os-chip" style="color:${e.color};border-color:${e.color};background:${e.color.replace(')',',0.1)')};">${e.name}</div>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:1px;margin-bottom:8px;text-transform:uppercase">Architecture Layers — click any layer for details</div>
+      <div class="layer-diagram" id="layer-diagram">
+        ${data.layers.map((l, i) => `
+          <div class="layer-item" style="background:${l.bg};border-color:transparent" onclick="selectLayer(${i})" id="layer-${i}">
+            <div>
+              <div class="layer-name" style="color:${l.color}">${l.name}</div>
+              <div class="layer-sub">${l.sub}</div>
+            </div>
+            <span style="color:${l.color};font-size:12px">▶</span>
+          </div>
+        `).join('')}
+      </div>
+      <div class="layer-tooltip" id="layer-tooltip"></div>
+    </div>
+  `;
+}
+
+const LAYER_TOOLTIPS = {
+  monolithic: [
+    'Applications like your terminal, browser, and text editor run here. They use system calls to ask the OS for services.',
+    'The boundary between user code and kernel code. Applications use library wrappers (libc) which invoke trap instructions.',
+    'The massive single-file kernel. Process scheduler, memory allocator, VFS, network stack, and all drivers live here as compiled-in code.',
+    'Thin layer that abstracts CPU-specific details. On x86-64, this maps to Protected Mode, APIC, and the interrupt subsystem.',
+    'The actual silicon: CPU cores, RAM chips, NIC, GPU, SSD controller.'
+  ],
+  layered: [
+    'End-user programs. Cannot skip layers — must use layer 4 services.',
+    'Buffers I/O requests, manages queues for slow devices.',
+    'Communication interface for console operators.',
+    'Virtual memory, segmentation, swapping to disk.',
+    'The processor scheduler. Allocates CPU time to processes.',
+    'Physical hardware — no software abstraction here.'
+  ],
+  microkernel: [
+    'All traditional OS services run here as regular processes! File server, network server, device drivers are just user programs.',
+    'All communication goes through message passing. A driver request is literally sending a message to the driver server process.',
+    'Contains ONLY: basic IPC, thread scheduling, address space management. Everything else is a user-space server.',
+    'Physical hardware. Only accessed by device driver servers via kernel IPC.'
+  ],
+  modular: [
+    'Ordinary user programs. They use the stable system call interface regardless of which modules are loaded.',
+    'The unchanging syscall API. Modules cannot change this.',
+    'Always-loaded essential services: scheduler, basic MM, core VFS.',
+    'Loaded/unloaded at runtime with insmod/rmmod. Example: ext4.ko, nvidia.ko, usbhid.ko. No reboot needed!',
+    'Physical devices. Kernel modules talk to them via I/O ports or MMIO.'
+  ],
+  hybrid: [
+    'Win32 or POSIX subsystem. Compatible application layer — same programs work on different NT versions.',
+    'Some OS services moved to user space for stability. CSRSS handles Win32 console, LSASS handles security.',
+    'The main executive: object manager, I/O manager, security reference monitor, cache manager, power manager.',
+    'The microkernel at the bottom: handles IPC (Mach messages on macOS), thread scheduling, and basic VM.',
+    'Hardware Abstraction Layer. Isolates the kernel from CPU-specific power management and interrupt routing.'
+  ]
+};
+
+function selectLayer(i) {
+  const data = STRUCTURE_DATA[currentStructureTab];
+  document.querySelectorAll('.layer-item').forEach((el, idx) => {
+    el.classList.toggle('selected', idx === i);
+  });
+  const tooltip = document.getElementById('layer-tooltip');
+  const tooltips = LAYER_TOOLTIPS[currentStructureTab];
+  tooltip.textContent = tooltips && tooltips[i] ? tooltips[i] : data.layers[i].sub;
+  tooltip.classList.add('show','fade-in');
+}
+
+// ─────────────────────────────────────────
+// OS TYPES
+// ─────────────────────────────────────────
+function renderOsTypes() {
+  const grid = document.getElementById('os-types-grid');
+  grid.innerHTML = OS_TYPES.map((t, i) => `
+    <div class="os-type-card" onclick="flipCard(${i})" id="oscard-${i}">
+      <div class="os-type-inner">
+        <div class="os-type-front" style="border-color:${t.border}">
+          <div class="os-type-emoji">${t.emoji}</div>
+          <div class="os-type-name" style="color:${t.color}">${t.name}</div>
+          <div class="os-type-year">${t.year}</div>
+          <div class="os-type-flip-hint">CLICK TO FLIP</div>
+        </div>
+        <div class="os-type-back" style="border-color:${t.border}">
+          <div class="os-type-back-title" style="color:${t.color}">${t.name}</div>
+          <div class="os-type-back-def">${t.def}</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">📌 Use case:</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:8px">${t.usecase}</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:2px">💻 Examples:</div>
+          <div class="os-type-back-eg">${t.example}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function flipCard(i) {
+  document.getElementById(`oscard-${i}`).classList.toggle('flipped');
+}
+
+function renderTimeline() {
+  const container = document.getElementById('os-timeline');
+  container.innerHTML = OS_TIMELINE.map(t => `
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="timeline-year">${t.year}</div>
+      <div class="timeline-label">${t.label}</div>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────
+// OS SERVICES
+// ─────────────────────────────────────────
+function renderServices() {
+  const container = document.getElementById('services-grid');
+  container.innerHTML = OS_SERVICES.map(s => `
+    <div class="card" style="border-left:3px solid ${s.color};transition:all 0.2s;cursor:default"
+         onmouseenter="this.style.background='rgba(255,255,255,0.02)'" 
+         onmouseleave="this.style.background='var(--panel)'">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:18px">${s.icon}</span>
+        <div class="card-title" style="color:${s.color};margin-bottom:0">${s.name}</div>
+      </div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.5">${s.desc}</div>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────
+// SIDEBAR MOBILE
+// ─────────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+</script>
+</body>
+</html>
