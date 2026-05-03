@@ -440,6 +440,8 @@ body::before {
 
 /* ===== CODE DISPLAY ===== */
 .code-display {
+  overflow-x: auto;
+  white-space: pre;
   background: var(--bg2);
   color: var(--text2);
   font-family: var(--mono);
@@ -584,3 +586,35 @@ hr.win-hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
   background: rgba(0,212,255,0.05); color: var(--text); font-size: 11px; font-weight: bold;
   padding: 8px 12px; text-align: center; border-bottom: 1px solid var(--border); font-family: var(--mono);
 }
+
+/* ===== RESPONSIVE MOBILE VIEW ===== */
+@media (max-width: 900px) {
+  body {
+    overflow-y: auto;
+    height: auto;
+  }
+  .main-layout {
+    flex-direction: column;
+    overflow-y: visible;
+    height: auto;
+  }
+  .left-panel, .center-panel, .right-panel {
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible;
+  }
+  .bottom-panel {
+    height: auto !important;
+    min-height: 150px;
+  }
+  .tabbar {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 10px;
+  }
+  .viz-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+

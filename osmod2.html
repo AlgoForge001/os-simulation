@@ -144,11 +144,54 @@ body::before {
 .cpu-box .process-name { font-weight: bold; font-size: 16px; color: var(--green); }
 .queue-box { background: rgba(248,113,113,0.1); border: 1px solid var(--red); color: var(--red); padding: 6px; font-size: 12px; font-family: var(--mono); border-radius: 4px; display: inline-block; margin: 4px; }
 .ready-box { background: rgba(0,212,255,0.1); border: 1px solid var(--cyan); color: var(--cyan); padding: 6px; font-size: 12px; font-family: var(--mono); border-radius: 4px; display: inline-block; margin: 4px; }
+
+/* ===== RESPONSIVE MOBILE VIEW ===== */
+@media (max-width: 900px) {
+  #app {
+    height: auto;
+    overflow-y: auto;
+  }
+  .win-body {
+    flex-direction: column;
+    height: auto;
+    overflow-y: visible;
+  }
+
+  .proc-table, .metrics-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  #left-panel, #right-panel {
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible;
+  }
+  .win-tabs {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .gantt-cell {
+    flex: 1 1 auto;
+    font-size: 10px;
+    height: 30px;
+  }
+  #gantt-area {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 60px;
+  }
+  .global-navbar {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
 </style>
+
 </head>
 <body>
   <!-- GLOBAL OS MODULES NAV BAR -->
-  <div style="background: rgba(10,10,20,0.95); border-bottom: 1px solid rgba(0,212,255,0.12); padding: 12px 20px; display: flex; gap: 16px; align-items: center; font-family: 'Syne', sans-serif; width: 100%; z-index: 10000; position: relative; box-sizing: border-box;">
+  <div style="background: rgba(10,10,20,0.95); border-bottom: 1px solid rgba(0,212,255,0.12); padding: 12px 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; justify-content: center; font-family: 'Syne', sans-serif; width: 100%; z-index: 10000; position: relative; box-sizing: border-box;">
     <span style="color: #00d4ff; font-weight: 700; font-size: 16px; letter-spacing: 1px;">▶ OS MODULES</span>
     <a href="osmod1.html" style="text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #94a3b8; background: transparent; border: 1px solid transparent;">Module 1: Intro</a>
     <a href="osmod2.html" style="text-decoration: none; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #00ff88; background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3); box-shadow: 0 0 10px rgba(0,255,136,0.2);">Module 2: Process & Scheduling</a>
